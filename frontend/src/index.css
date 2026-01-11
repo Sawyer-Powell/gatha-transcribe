@@ -1,4 +1,48 @@
 @import "tailwindcss";
+@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/preflight" layer(base);
+
+@layer theme {
+  @keyframes overlay-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes overlay-fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes dialog-slide-in {
+    from {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% + 1rem));
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, -50%);
+    }
+  }
+
+  @keyframes dialog-slide-out {
+    from {
+      opacity: 1;
+      transform: translate(-50%, -50%);
+    }
+    to {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% + 0.75rem));
+    }
+  }
+}
 
 @theme {
   /* Gruvbox Light Color Scheme */

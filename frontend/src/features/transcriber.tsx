@@ -6,6 +6,8 @@ import { Sidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { GripVertical, ChevronLeft, ChevronRight } from "lucide-preact";
 import { render } from "preact";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { UploadVideoModal } from "@/components/UploadVideoModal";
 
 export interface TranscriberProps {
   videoPath: string;
@@ -22,6 +24,29 @@ const sampleVideos = [
 export const Transcriber: React.FC<TranscriberProps> = ({ videoPath }) => {
   const [sidebarVisible, setSidebarVisible] = React.useState(true);
   const [selectedVideoId, setSelectedVideoId] = React.useState<string>('3');
+  const [countdown, setCountdown] = React.useState<number>(0);
+  const [uploadModalOpen, setUploadModalOpen] = React.useState(false);
+
+  // Connect to WebSocket
+  const { status } = useWebSocket();
+
+  const handleUploadComplete = (videoId: string) => {
+    console.log('Upload complete:', videoId);
+    // TODO: Add video to the list and select it
+    setUploadModalOpen(false);
+  };
+
+  // Update countdown timer for reconnection
+  React.useEffect(() => {
+    if (status.state === 'waiting-to-reconnect') {
+      const interval = setInterval(() => {
+        const remaining = status.reconnectAt - Date.now();
+        setCountdown(Math.max(0, remaining));
+      }, 50); // Update every 50ms for smooth countdown
+
+      return () => clearInterval(interval);
+    }
+  }, [status]);
 
   const selectedVideo = sampleVideos.find((v) => v.id === selectedVideoId);
 
@@ -45,6 +70,7 @@ export const Transcriber: React.FC<TranscriberProps> = ({ videoPath }) => {
             videos={sampleVideos}
             selectedVideoId={selectedVideoId}
             onVideoSelect={setSelectedVideoId}
+            onUpload={() => setUploadModalOpen(true)}
           />
         </div>
       </div>
@@ -97,8 +123,58 @@ export const Transcriber: React.FC<TranscriberProps> = ({ videoPath }) => {
               return gutter;
             }}
           >
-            <div className="min-h-full max-h-full p-4">
-              <Card className="w-full overflow-auto">
+            <div className="min-h-full max-h-full p-4 flex flex-col gap-2">
+              <div className="relative h-5">
+                {/* Connected state */}
+                <div
+                  className={`absolute inset-0 flex items-center gap-2 transition-opacity duration-300 ${
+                    status.state === 'connected' ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                  }`}
+                >
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-xs text-muted-foreground">
+                    Connected to transcription server
+                  </span>
+                </div>
+
+                {/* Connecting state */}
+                <div
+                  className={`absolute inset-0 flex items-center gap-2 transition-opacity duration-300 ${
+                    status.state === 'connecting' ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                  }`}
+                >
+                  <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                  <span className="text-xs text-muted-foreground">
+                    Connecting...
+                  </span>
+                </div>
+
+                {/* Waiting to reconnect state */}
+                <div
+                  className={`absolute inset-0 flex items-center gap-2 transition-opacity duration-300 ${
+                    status.state === 'waiting-to-reconnect' ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                  }`}
+                >
+                  <div className="w-2 h-2 rounded-full bg-orange-500" />
+                  <span className="text-xs text-muted-foreground">
+                    {status.state === 'waiting-to-reconnect' &&
+                      `Attempting reconnection in ${(countdown / 1000).toFixed(1)}s (attempt ${status.attempt})`}
+                  </span>
+                </div>
+
+                {/* Disconnected state */}
+                <div
+                  className={`absolute inset-0 flex items-center gap-2 transition-opacity duration-300 ${
+                    status.state === 'disconnected' ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                  }`}
+                >
+                  <div className="w-2 h-2 rounded-full bg-red-500" />
+                  <span className="text-xs text-muted-foreground">
+                    Disconnected from server
+                  </span>
+                </div>
+              </div>
+              <Card className="mt-2 h-fit w-full overflow-auto">
                 <h2 className="text-xl font-semibold mb-4">Transcription</h2>
                 <p className="text-sm text-muted-foreground mb-2">
                   This is sample text for the transcription panel. The transcript of
@@ -122,6 +198,12 @@ export const Transcriber: React.FC<TranscriberProps> = ({ videoPath }) => {
           </Split>
         </div>
       </div>
+
+      <UploadVideoModal
+        open={uploadModalOpen}
+        onOpenChange={setUploadModalOpen}
+        onUploadComplete={handleUploadComplete}
+      />
     </div>
   );
 };

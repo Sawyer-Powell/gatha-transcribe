@@ -1,1 +1,7 @@
 /target
+/test_filestore
+*.db
+*.db-shm
+*.db-wal
+.env
+.claude

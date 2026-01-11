@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, file_path, original_filename, uploaded_at as \"uploaded_at: _\" FROM videos ORDER BY uploaded_at DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "file_path",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "original_filename",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "uploaded_at: _",
+        "ordinal": 3,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "3bc2f9eb6e755eae596eede0919d3482923184cc446e501e5782cc008b734145"
+}
