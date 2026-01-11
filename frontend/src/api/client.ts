@@ -4,6 +4,7 @@ import type { paths } from "./schema";
 // Create a typed fetch client
 const client = createClient<paths>({
   baseUrl: "http://localhost:3000",
+  credentials: "include", // Send cookies with all requests
 });
 
 // Example usage:

@@ -1,7 +1,9 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { Search, Upload } from "lucide-preact";
+import { Search, Upload, LogOut } from "lucide-preact";
 import { Button } from "./button";
+import { useLocation } from "preact-iso";
+import { useAuthStore } from "../../stores/authStore";
 
 export interface Video {
   id: string;
@@ -25,6 +27,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   className,
 }) => {
   const [searchQuery, setSearchQuery] = React.useState("");
+  const { logout, user } = useAuthStore();
+  const location = useLocation();
+
+  const handleLogout = async () => {
+    await logout();
+    location.route('/login');
+  };
 
   const filteredVideos = videos.filter((video) =>
     video.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -33,7 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <div className={cn("flex flex-col h-full gap-4 p-4", className)}>
       <div className="flex-shrink-0">
-        <h2 className="text-xl font-semibold mb-1">{userName}</h2>
+        <h2 className="text-xl font-semibold mb-1">{user?.name ?? userName}</h2>
         <p className="text-sm text-muted-foreground">
           {videos.length} {videos.length === 1 ? "video" : "videos"}
         </p>
@@ -68,13 +77,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      <div className="flex-shrink-0">
+      <div className="flex-shrink-0 space-y-2">
         <Button
           onClick={onUpload}
           className="w-full"
         >
           <Upload className="w-4 h-4 mr-2" />
           Upload Video
+        </Button>
+        <Button
+          onClick={handleLogout}
+          variant="outline"
+          className="w-full"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Logout
         </Button>
       </div>
     </div>

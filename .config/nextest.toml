@@ -1,0 +1,33 @@
+# Nextest configuration for gatha-transcribe
+
+[profile.default]
+# Run tests in parallel (default)
+test-threads = "num-cpus"
+
+# Show output for all tests
+status-level = "all"
+final-status-level = "all"
+
+# Show test timings
+slow-timeout = { period = "60s", terminate-after = 3 }
+
+[profile.ci]
+# Stricter settings for CI
+retries = 2
+fail-fast = false
+
+[profile.profiling]
+# Profile configuration for performance testing
+# Runs tests serially to get accurate timing
+test-threads = 1
+
+# Show detailed timing information
+slow-timeout = { period = "120s" }
+
+# Capture all output
+success-output = "immediate"
+failure-output = "immediate"
+
+# Enable verbose mode
+status-level = "all"
+final-status-level = "all"

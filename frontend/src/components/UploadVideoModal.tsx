@@ -25,6 +25,7 @@ const ACCEPTED_VIDEO_TYPES = [
 ];
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 export const UploadVideoModal: React.FC<UploadVideoModalProps> = ({
   open,
@@ -73,28 +74,31 @@ export const UploadVideoModal: React.FC<UploadVideoModalProps> = ({
     }
   }, [selectedFile]);
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
 
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      handleFileSelect(files[0]);
+    if (e.dataTransfer?.files) {
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0 && files[0]) {
+        handleFileSelect(files[0]);
+      }
     }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+    const target = e.target as HTMLInputElement;
+    const files = target.files;
     if (files && files.length > 0) {
       handleFileSelect(files[0]);
     }
@@ -109,25 +113,33 @@ export const UploadVideoModal: React.FC<UploadVideoModalProps> = ({
 
     try {
       const formData = new FormData();
-      formData.append("video", selectedFile);
+      formData.append("video", selectedFile, selectedFile.name);
 
       const xhr = new XMLHttpRequest();
 
       xhr.upload.addEventListener("progress", (e) => {
         if (e.lengthComputable) {
-          const progress = (e.loaded / e.total) * 100;
+          // Cap at 95% to show processing time after upload
+          const progress = Math.min((e.loaded / e.total) * 100, 95);
           setUploadProgress(progress);
         }
       });
 
+      // When upload completes, show we're processing
+      xhr.upload.addEventListener("loadend", () => {
+        setUploadProgress(98);
+      });
+
       xhr.addEventListener("load", () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          const response = JSON.parse(xhr.responseText);
-          setIsUploading(false);
+          // Complete the progress bar
           setUploadProgress(100);
+
+          const response = JSON.parse(xhr.responseText);
 
           // Show success briefly before closing
           setTimeout(() => {
+            setIsUploading(false);
             onUploadComplete?.(response.id || "new-video");
             handleCancel();
           }, 500);
@@ -140,7 +152,8 @@ export const UploadVideoModal: React.FC<UploadVideoModalProps> = ({
         throw new Error("Upload failed. Please try again.");
       });
 
-      xhr.open("POST", "/api/videos/upload");
+      // Use absolute URL to backend server
+      xhr.open("POST", `${API_BASE_URL}/api/videos/upload`);
       xhr.send(formData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -270,7 +283,7 @@ export const UploadVideoModal: React.FC<UploadVideoModalProps> = ({
                   </div>
                   <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-primary transition-all duration-300"
+                      className="h-full bg-primary"
                       style={{ width: `${uploadProgress}%` }}
                     />
                   </div>

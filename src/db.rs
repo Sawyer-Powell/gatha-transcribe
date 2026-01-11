@@ -22,6 +22,28 @@ impl Video {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct User {
+    pub id: String,
+    pub name: String,
+    pub email: String,
+    #[serde(skip_serializing)] // Never send to client
+    pub hashed_password: String,
+    pub created_at: DateTime<Utc>,
+}
+
+impl User {
+    pub fn new(name: String, email: String, hashed_password: String) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            name,
+            email,
+            hashed_password,
+            created_at: Utc::now(),
+        }
+    }
+}
+
 /// Database connection and operations
 pub struct Database {
     pool: SqlitePool,
@@ -88,5 +110,44 @@ impl Database {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    /// Insert a new user record
+    pub async fn insert_user(&self, user: &User) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            "INSERT INTO users (id, name, email, hashed_password, created_at) VALUES (?, ?, ?, ?, ?)",
+            user.id,
+            user.name,
+            user.email,
+            user.hashed_password,
+            user.created_at
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Get a user by email (for login)
+    pub async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error> {
+        let user = sqlx::query_as!(
+            User,
+            r#"SELECT id, name, email, hashed_password, created_at as "created_at: _" FROM users WHERE email = ?"#,
+            email
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(user)
+    }
+
+    /// Get a user by ID (for auth middleware)
+    pub async fn get_user_by_id(&self, id: &str) -> Result<Option<User>, sqlx::Error> {
+        let user = sqlx::query_as!(
+            User,
+            r#"SELECT id, name, email, hashed_password, created_at as "created_at: _" FROM users WHERE id = ?"#,
+            id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(user)
     }
 }

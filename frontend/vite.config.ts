@@ -24,10 +24,18 @@ export default defineConfig({
     projects: [
       // Unit tests
       {
+        resolve: {
+          alias: {
+            '@': path.resolve(dirname, './src'),
+            'react': 'preact/compat',
+            'react-dom': 'preact/compat',
+          },
+        },
         test: {
           name: 'unit',
           environment: 'jsdom',
           include: ['src/**/*.test.{ts,tsx}'],
+          setupFiles: ['./src/test-setup.ts'],
         }
       },
       // Storybook tests
