@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createWebSocketConnection, type ConnectionStatus, calculateBackoffDelay } from './websocket';
 import type { ServerMessage } from '../types/ServerMessage';
 
@@ -21,20 +21,32 @@ describe('createWebSocketConnection', () => {
 
   class MockWebSocket {
     url: string;
+    readyState: number = 0; // CONNECTING
     onopen: ((event: any) => void) | null = null;
     onclose: ((event: any) => void) | null = null;
     onmessage: ((event: any) => void) | null = null;
+    static readonly CONNECTING = 0;
+    static readonly OPEN = 1;
+    static readonly CLOSING = 2;
+    static readonly CLOSED = 3;
+    sentMessages: string[] = [];
 
     constructor(url: string) {
       this.url = url;
       mockWs = this;
     }
 
+    send(data: string) {
+      this.sentMessages.push(data);
+    }
+
     close() {
+      this.readyState = 3; // CLOSED
       if (this.onclose) this.onclose({});
     }
 
     simulateOpen() {
+      this.readyState = 1; // OPEN
       if (this.onopen) this.onopen({});
     }
 
@@ -87,7 +99,7 @@ describe('createWebSocketConnection', () => {
   };
 
   it('should connect and handle messages', () => {
-    const cleanup = createConnection();
+    const connection = createConnection();
 
     expect(statusChanges[0]).toEqual({ state: 'connecting' });
 
@@ -97,11 +109,49 @@ describe('createWebSocketConnection', () => {
     mockWs.simulateMessage({ type: 'TestMessage', text: 'Hello' });
     expect(messages[0]).toEqual({ type: 'TestMessage', text: 'Hello' });
 
-    cleanup();
+    connection.disconnect();
+  });
+
+  it('should send messages when connected', () => {
+    const connection = createConnection();
+
+    mockWs.simulateOpen();
+
+    connection.send({
+      type: 'UpdatePlaybackPosition',
+      current_time: 42.5,
+    });
+
+    expect(mockWs.sentMessages).toHaveLength(1);
+    expect(JSON.parse(mockWs.sentMessages[0])).toEqual({
+      type: 'UpdatePlaybackPosition',
+      current_time: 42.5,
+    });
+
+    connection.disconnect();
+  });
+
+  it('should handle StateSync messages', () => {
+    const connection = createConnection();
+
+    mockWs.simulateOpen();
+
+    // Simulate StateSync message from server
+    mockWs.simulateMessage({
+      type: 'StateSync',
+      session: { current_time: 100.5 },
+    });
+
+    expect(messages[0]).toEqual({
+      type: 'StateSync',
+      session: { current_time: 100.5 },
+    });
+
+    connection.disconnect();
   });
 
   it('should reconnect with exponential backoff', () => {
-    const cleanup = createConnection({ initialRetryDelay: 1000 });
+    const connection = createConnection({ initialRetryDelay: 1000 });
 
     mockWs.simulateOpen();
     mockWs.close();
@@ -123,19 +173,101 @@ describe('createWebSocketConnection', () => {
       reconnectAt: currentTime + 2000,
     });
 
-    cleanup();
+    connection.disconnect();
   });
 
   it('should cleanup and stop reconnecting', () => {
-    const cleanup = createConnection({ initialRetryDelay: 100 });
+    const connection = createConnection({ initialRetryDelay: 100 });
 
     mockWs.simulateOpen();
     mockWs.close();
 
-    expect(timers.size).toBe(1);
+    // Should have 2 timers: reconnect + StateSync timeout (not cleared until reconnect)
+    expect(timers.size).toBeGreaterThanOrEqual(1);
 
-    cleanup();
+    connection.disconnect();
 
     expect(timers.size).toBe(0);
+  });
+
+  it('should timeout if StateSync not received', () => {
+    const timeoutCallback = vi.fn();
+    const connection = createConnection({
+      stateSyncTimeout: 2000,
+      onStateSyncTimeout: timeoutCallback,
+    });
+
+    mockWs.simulateOpen();
+
+    // StateSync timeout should be set
+    expect(timers.size).toBe(1);
+
+    // Run timeout
+    runTimers(2000);
+
+    // Callback should be called
+    expect(timeoutCallback).toHaveBeenCalledOnce();
+
+    connection.disconnect();
+  });
+
+  it('should cancel timeout when StateSync received', () => {
+    const timeoutCallback = vi.fn();
+    const connection = createConnection({
+      stateSyncTimeout: 2000,
+      onStateSyncTimeout: timeoutCallback,
+    });
+
+    mockWs.simulateOpen();
+
+    // Send StateSync message
+    mockWs.simulateMessage({
+      type: 'StateSync',
+      session: { current_time: 0 },
+    });
+
+    // Timeout should be cleared
+    expect(timers.size).toBe(0);
+
+    // Run the timer that would have fired
+    runTimers(2000);
+
+    // Callback should NOT be called
+    expect(timeoutCallback).not.toHaveBeenCalled();
+
+    connection.disconnect();
+  });
+
+  it('should reset StateSync flag on reconnection', () => {
+    const timeoutCallback = vi.fn();
+    const connection = createConnection({
+      stateSyncTimeout: 2000,
+      onStateSyncTimeout: timeoutCallback,
+      initialRetryDelay: 100,
+    });
+
+    mockWs.simulateOpen();
+
+    // Receive StateSync
+    mockWs.simulateMessage({
+      type: 'StateSync',
+      session: { current_time: 0 },
+    });
+
+    // Disconnect and reconnect
+    mockWs.close();
+    runTimers(100);
+    mockWs.simulateOpen();
+
+    // Should start new timeout on reconnection
+    expect(timers.size).toBe(1);
+
+    // Run timeout
+    runTimers(2000);
+
+    // Should timeout because StateSync not received after reconnection
+    expect(timeoutCallback).toHaveBeenCalledOnce();
+
+    connection.disconnect();
   });
 });

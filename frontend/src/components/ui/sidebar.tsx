@@ -1,18 +1,23 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { Search, Upload, LogOut } from "lucide-preact";
+import { Search, Upload, LogOut, Loader2 } from "lucide-preact";
 import { Button } from "./button";
 import { useLocation } from "preact-iso";
 import { useAuthStore } from "../../stores/authStore";
 
 export interface Video {
   id: string;
-  title: string;
+  original_filename: string;
+  file_path: string;
+  user_id: string;
+  uploaded_at: string;
 }
 
 export interface SidebarProps {
   userName: string;
   videos: Video[];
+  isLoading?: boolean;
+  isError?: boolean;
   onVideoSelect?: (videoId: string) => void;
   onUpload?: () => void;
   selectedVideoId?: string;
@@ -22,8 +27,11 @@ export interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   userName,
   videos,
+  isLoading = false,
+  isError = false,
   onVideoSelect,
   onUpload,
+  selectedVideoId,
   className,
 }) => {
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -36,7 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const filteredVideos = videos.filter((video) =>
-    video.title.toLowerCase().includes(searchQuery.toLowerCase())
+    video?.original_filename?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -60,9 +68,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       <div className="flex-1 overflow-auto space-y-2">
-        {filteredVideos.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8 gap-2">
+            <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
+            <p className="text-sm text-muted-foreground">Loading videos...</p>
+          </div>
+        ) : isError ? (
+          <p className="text-sm text-destructive text-center py-4">
+            Failed to load videos
+          </p>
+        ) : filteredVideos.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
-            No videos found
+            {searchQuery ? "No videos found" : "No videos yet"}
           </p>
         ) : (
           filteredVideos.map((video) => (
@@ -70,8 +87,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               variant={"ghost"}
               key={video.id}
               onClick={() => onVideoSelect?.(video.id)}
+              active={selectedVideoId === video.id}
+              className="w-full justify-start"
             >
-              <p className="text-sm font-medium truncate">{video.title}</p>
+              <p className="text-sm font-medium truncate">{video.original_filename}</p>
             </Button>
           ))
         )}

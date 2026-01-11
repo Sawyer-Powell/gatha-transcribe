@@ -3,6 +3,7 @@ use gatha_transcribe::{
     messages::ServerMessage,
     db::Database,
     filestore::LocalFileStore,
+    session_store::InMemorySessionStore,
     upload::AppState,
 };
 use ts_rs::TS;
@@ -25,9 +26,12 @@ async fn main() {
         .await
         .expect("Failed to create filestore");
 
+    let session_store = InMemorySessionStore::new();
+
     let state = Arc::new(AppState {
         db,
         filestore: Arc::new(filestore),
+        session_store: Arc::new(session_store),
     });
 
     let (_router, api) = create_router(state);

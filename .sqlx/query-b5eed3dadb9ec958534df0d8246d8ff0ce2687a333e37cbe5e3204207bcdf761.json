@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, file_path, original_filename, uploaded_at as \"uploaded_at: _\" FROM videos WHERE id = ?",
+  "query": "SELECT id, file_path, original_filename, user_id, uploaded_at as \"uploaded_at: _\" FROM videos WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -19,8 +19,13 @@
         "type_info": "Text"
       },
       {
-        "name": "uploaded_at: _",
+        "name": "user_id",
         "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "uploaded_at: _",
+        "ordinal": 4,
         "type_info": "Text"
       }
     ],
@@ -31,8 +36,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "0b1745005b532349b9529d6bc3a243cdffdd3662bba669393d0e6f34617dc5bc"
+  "hash": "b5eed3dadb9ec958534df0d8246d8ff0ce2687a333e37cbe5e3204207bcdf761"
 }

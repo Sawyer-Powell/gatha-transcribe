@@ -30,9 +30,11 @@ jsonwebtoken = "9.2"
 tower-cookies = "0.11"
 rand = "0.8"
 validator = { version = "0.18", features = ["derive"] }
+reqwest = { version = "0.12", features = ["multipart", "stream", "json", "cookies"] }
 
 [dev-dependencies]
-reqwest = { version = "0.12", features = ["multipart", "stream", "json", "cookies"] }
 tokio-test = "0.4"
 tempfile = "3.14"
 futures = "0.3"
+tokio-tungstenite = "0.26"
+http = "1.2"

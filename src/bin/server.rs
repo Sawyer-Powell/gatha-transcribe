@@ -1,10 +1,4 @@
-use gatha_transcribe::{
-    create_router,
-    db::Database,
-    filestore::LocalFileStore,
-    upload::AppState,
-};
-use std::{path::PathBuf, sync::Arc};
+use gatha_transcribe::start_server;
 use tracing::info;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
@@ -28,51 +22,13 @@ async fn main() {
 
     info!("Starting gatha-transcribe server");
 
-    // Load environment variables
-    dotenvy::dotenv().ok();
-
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "sqlite:gatha.db".to_string());
-
-    let filestore_path = std::env::var("FILESTORE_PATH")
-        .unwrap_or_else(|_| "test_filestore".to_string());
-
-    // Initialize database
-    info!(database_url = %database_url, "Connecting to database");
-    let db = Database::new(&database_url)
+    // Start server on port 3000
+    let (server_task, _state) = start_server(3000, None, None)
         .await
-        .expect("Failed to connect to database");
+        .expect("Failed to start server");
 
-    // Run migrations
-    info!("Running database migrations");
-    db.run_migrations()
-        .await
-        .expect("Failed to run migrations");
-    info!("Database migrations complete");
-
-    // Initialize filestore
-    info!(path = %filestore_path, "Initializing filestore");
-    let filestore = LocalFileStore::new(PathBuf::from(filestore_path))
-        .await
-        .expect("Failed to initialize filestore");
-    info!("Filestore initialized");
-
-    // Create app state
-    let state = Arc::new(AppState {
-        db,
-        filestore: Arc::new(filestore),
-    });
-
-    let (router, _api) = create_router(state);
-
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
-        .await
-        .expect("Failed to bind to port 3000");
-
-    let addr = listener.local_addr().expect("Failed to get local address");
-    info!(%addr, "Server listening");
-
-    axum::serve(listener, router)
-        .await
+    // Wait for server to complete
+    server_task.await
+        .expect("Server task panicked")
         .expect("Server failed");
 }

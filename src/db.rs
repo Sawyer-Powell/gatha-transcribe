@@ -1,22 +1,26 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct Video {
     pub id: String,
     pub file_path: String,
     pub original_filename: String,
+    pub user_id: String,
+    #[schema(value_type = String, format = DateTime)]
     pub uploaded_at: DateTime<Utc>,
 }
 
 impl Video {
-    pub fn new(file_path: String, original_filename: String) -> Self {
+    pub fn new(file_path: String, original_filename: String, user_id: String) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
             file_path,
             original_filename,
+            user_id,
             uploaded_at: Utc::now(),
         }
     }
@@ -70,10 +74,11 @@ impl Database {
     /// Insert a new video record
     pub async fn insert_video(&self, video: &Video) -> Result<(), sqlx::Error> {
         sqlx::query!(
-            "INSERT INTO videos (id, file_path, original_filename, uploaded_at) VALUES (?, ?, ?, ?)",
+            "INSERT INTO videos (id, file_path, original_filename, user_id, uploaded_at) VALUES (?, ?, ?, ?, ?)",
             video.id,
             video.file_path,
             video.original_filename,
+            video.user_id,
             video.uploaded_at
         )
         .execute(&self.pool)
@@ -85,7 +90,7 @@ impl Database {
     pub async fn get_video(&self, id: &str) -> Result<Option<Video>, sqlx::Error> {
         let video = sqlx::query_as!(
             Video,
-            r#"SELECT id, file_path, original_filename, uploaded_at as "uploaded_at: _" FROM videos WHERE id = ?"#,
+            r#"SELECT id, file_path, original_filename, user_id, uploaded_at as "uploaded_at: _" FROM videos WHERE id = ?"#,
             id
         )
         .fetch_optional(&self.pool)
@@ -97,7 +102,19 @@ impl Database {
     pub async fn list_videos(&self) -> Result<Vec<Video>, sqlx::Error> {
         let videos = sqlx::query_as!(
             Video,
-            r#"SELECT id, file_path, original_filename, uploaded_at as "uploaded_at: _" FROM videos ORDER BY uploaded_at DESC"#
+            r#"SELECT id, file_path, original_filename, user_id, uploaded_at as "uploaded_at: _" FROM videos ORDER BY uploaded_at DESC"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(videos)
+    }
+
+    /// Get all videos uploaded by a specific user
+    pub async fn get_videos_by_user(&self, user_id: &str) -> Result<Vec<Video>, sqlx::Error> {
+        let videos = sqlx::query_as!(
+            Video,
+            r#"SELECT id, file_path, original_filename, user_id, uploaded_at as "uploaded_at: _" FROM videos WHERE user_id = ? ORDER BY uploaded_at DESC"#,
+            user_id
         )
         .fetch_all(&self.pool)
         .await?;
@@ -149,5 +166,99 @@ impl Database {
         .fetch_optional(&self.pool)
         .await?;
         Ok(user)
+    }
+
+    /// Upsert a transcription session (insert or update)
+    pub async fn upsert_session(
+        &self,
+        user_id: &str,
+        video_id: &str,
+        state_json: &str,
+    ) -> Result<(), sqlx::Error> {
+        let now = Utc::now();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO transcription_sessions (user_id, video_id, state_json, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, video_id) DO UPDATE SET
+                state_json = excluded.state_json,
+                updated_at = excluded.updated_at
+            "#,
+            user_id,
+            video_id,
+            state_json,
+            now,
+            now
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Get a transcription session by user_id and video_id
+    pub async fn get_session(
+        &self,
+        user_id: &str,
+        video_id: &str,
+    ) -> Result<Option<String>, sqlx::Error> {
+        let result = sqlx::query!(
+            "SELECT state_json FROM transcription_sessions WHERE user_id = ? AND video_id = ?",
+            user_id,
+            video_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(result.map(|row| row.state_json))
+    }
+
+    /// List all sessions (for loading on startup)
+    pub async fn list_all_sessions(&self) -> Result<Vec<(String, String, String)>, sqlx::Error> {
+        let rows = sqlx::query!(
+            "SELECT user_id, video_id, state_json FROM transcription_sessions"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| (row.user_id, row.video_id, row.state_json))
+            .collect())
+    }
+
+    /// Batch upsert multiple sessions in a single transaction
+    pub async fn upsert_sessions_batch(
+        &self,
+        sessions: Vec<(String, String, String)>, // (user_id, video_id, state_json)
+    ) -> Result<(), sqlx::Error> {
+        if sessions.is_empty() {
+            return Ok(());
+        }
+
+        let now = Utc::now();
+        let mut tx = self.pool.begin().await?;
+
+        for (user_id, video_id, state_json) in sessions {
+            sqlx::query!(
+                r#"
+                INSERT INTO transcription_sessions (user_id, video_id, state_json, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, video_id) DO UPDATE SET
+                    state_json = excluded.state_json,
+                    updated_at = excluded.updated_at
+                "#,
+                user_id,
+                video_id,
+                state_json,
+                now,
+                now
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+        Ok(())
     }
 }

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT state_json FROM transcription_sessions WHERE user_id = ? AND video_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "state_json",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6901c343178f1ff4778cce4802f55d9f5d36631114c61b5f486c6d69852b3fc2"
+}

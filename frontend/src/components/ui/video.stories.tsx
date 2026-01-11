@@ -9,9 +9,9 @@ const meta = {
   },
   tags: ['autodocs'],
   argTypes: {
-    src: {
+    videoId: {
       control: 'text',
-      description: 'Path to the video file',
+      description: 'Video ID for streaming',
     },
   },
 } satisfies Meta<typeof Video>;
@@ -19,30 +19,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {
+export const NoVideo: Story = {
   args: {
-    src: '/Zoom Meeting Recording (1).mp4',
+    videoId: undefined,
   },
 };
 
-export const CustomWidth: Story = {
+export const WithVideoId: Story = {
   args: {
-    src: '/Zoom Meeting Recording (1).mp4',
-    className: 'max-w-md',
-  },
-};
-
-export const Muted: Story = {
-  args: {
-    src: '/Zoom Meeting Recording (1).mp4',
-    muted: true,
-  },
-};
-
-export const Autoplay: Story = {
-  args: {
-    src: '/Zoom Meeting Recording (1).mp4',
-    autoplay: true,
-    muted: true,
+    videoId: 'test-video-123',
   },
 };

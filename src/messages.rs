@@ -6,4 +6,8 @@ use ts_rs::TS;
 #[ts(export, export_to = "../frontend/src/types/")]
 pub enum ServerMessage {
     TestMessage { text: String },
+    StateSync {
+        #[ts(type = "any")]
+        session: serde_json::Value,
+    },
 }

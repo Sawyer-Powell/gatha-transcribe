@@ -5,12 +5,12 @@ export function useWebSocket(url: string = 'ws://localhost:3000/ws') {
   const [status, setStatus] = useState<ConnectionStatus>({ state: 'connecting' });
 
   useEffect(() => {
-    const cleanup = createWebSocketConnection({
+    const connection = createWebSocketConnection({
       url,
       onStatusChange: setStatus,
     });
 
-    return cleanup;
+    return () => connection.disconnect();
   }, [url]);
 
   return { status };

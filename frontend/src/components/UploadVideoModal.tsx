@@ -143,6 +143,8 @@ export const UploadVideoModal: React.FC<UploadVideoModalProps> = ({
             onUploadComplete?.(response.id || "new-video");
             handleCancel();
           }, 500);
+        } else if (xhr.status === 401) {
+          throw new Error("Authentication required. Please log in again.");
         } else {
           throw new Error(`Upload failed with status ${xhr.status}`);
         }
@@ -154,6 +156,8 @@ export const UploadVideoModal: React.FC<UploadVideoModalProps> = ({
 
       // Use absolute URL to backend server
       xhr.open("POST", `${API_BASE_URL}/api/videos/upload`);
+      // Include credentials (cookies) for authentication
+      xhr.withCredentials = true;
       xhr.send(formData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");

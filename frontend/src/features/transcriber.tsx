@@ -6,60 +6,52 @@ import { Sidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { GripVertical, ChevronLeft, ChevronRight } from "lucide-preact";
 import { render } from "preact";
-import { useWebSocket } from "@/hooks/useWebSocket";
 import { UploadVideoModal } from "@/components/UploadVideoModal";
+import { useVideos } from "@/hooks/useVideos";
+import { useTranscriberStore } from "@/stores/transcriberStore";
 
-export interface TranscriberProps {
-  videoPath: string;
-}
+export interface TranscriberProps {}
 
-const sampleVideos = [
-  { id: '1', title: 'Introduction to React' },
-  { id: '2', title: 'Advanced TypeScript Patterns' },
-  { id: '3', title: 'Zoom Meeting Recording - Project Review' },
-  { id: '4', title: 'Team Standup - Monday' },
-  { id: '5', title: 'Client Presentation Q1 2024' },
-];
-
-export const Transcriber: React.FC<TranscriberProps> = ({ videoPath }) => {
+export const Transcriber: React.FC<TranscriberProps> = () => {
   const [sidebarVisible, setSidebarVisible] = React.useState(true);
-  const [selectedVideoId, setSelectedVideoId] = React.useState<string>('3');
-  const [countdown, setCountdown] = React.useState<number>(0);
   const [uploadModalOpen, setUploadModalOpen] = React.useState(false);
 
-  // Connect to WebSocket
-  const { status } = useWebSocket();
+  // Transcriber store for persisted state
+  const selectedVideoId = useTranscriberStore((state) => state.selectedVideoId);
+  const setSelectedVideoId = useTranscriberStore((state) => state.setSelectedVideoId);
+  const splitSizes = useTranscriberStore((state) => state.splitSizes) || [70, 30];
+  const setSplitSizes = useTranscriberStore((state) => state.setSplitSizes);
+
+  // Fetch videos from server
+  const { data: videos = [], isLoading, isError, refetch } = useVideos();
 
   const handleUploadComplete = (videoId: string) => {
     console.log('Upload complete:', videoId);
-    // TODO: Add video to the list and select it
+    // Refetch videos and select the newly uploaded one
+    refetch();
+    setSelectedVideoId(videoId);
     setUploadModalOpen(false);
   };
 
-  // Update countdown timer for reconnection
-  React.useEffect(() => {
-    if (status.state === 'waiting-to-reconnect') {
-      const interval = setInterval(() => {
-        const remaining = status.reconnectAt - Date.now();
-        setCountdown(Math.max(0, remaining));
-      }, 50); // Update every 50ms for smooth countdown
+  const selectedVideo = videos.find((v) => v.id === selectedVideoId);
 
-      return () => clearInterval(interval);
+  // Handle split size changes
+  const handleSplitChange = (sizes: number[]) => {
+    if (sizes.length === 2) {
+      setSplitSizes([sizes[0], sizes[1]]);
     }
-  }, [status]);
-
-  const selectedVideo = sampleVideos.find((v) => v.id === selectedVideoId);
+  };
 
   return (
     <div className="h-screen w-screen flex relative overflow-hidden">
       <div
-        className="w-80 flex-shrink-0 border-r border-border transition-transform"
+        className="w-80 flex-shrink-0 border-r border-border transition-transform h-full"
         style={{
           transform: sidebarVisible ? 'translateX(0)' : 'translateX(-288px)',
         }}
       >
         <div
-          className="transition-all"
+          className="transition-all h-full"
           style={{
             filter: sidebarVisible ? 'none' : 'blur(4px)',
             opacity: sidebarVisible ? 1 : 0.5,
@@ -67,8 +59,10 @@ export const Transcriber: React.FC<TranscriberProps> = ({ videoPath }) => {
         >
           <Sidebar
             userName="Sawyer"
-            videos={sampleVideos}
-            selectedVideoId={selectedVideoId}
+            videos={videos}
+            isLoading={isLoading}
+            isError={isError}
+            selectedVideoId={selectedVideoId ?? undefined}
             onVideoSelect={setSelectedVideoId}
             onUpload={() => setUploadModalOpen(true)}
           />
@@ -96,16 +90,17 @@ export const Transcriber: React.FC<TranscriberProps> = ({ videoPath }) => {
       >
         <div className="flex-shrink-0 p-4 border-b border-border flex items-center gap-4">
           {selectedVideo && (
-            <h1 className="pl-4 text-lg font-semibold">{selectedVideo.title}</h1>
+            <h1 className="pl-4 text-lg font-semibold">{selectedVideo.original_filename}</h1>
           )}
         </div>
 
         <div className="flex-1 p-4">
           <Split
-            sizes={[70, 30]}
+            sizes={Array.isArray(splitSizes) ? splitSizes : [70, 30]}
             minSize={20}
             gutterSize={16}
             className="h-full w-full flex"
+            onDragEnd={handleSplitChange}
             gutter={(_index, direction) => {
               const gutter = document.createElement("div");
               gutter.className =
@@ -124,57 +119,7 @@ export const Transcriber: React.FC<TranscriberProps> = ({ videoPath }) => {
             }}
           >
             <div className="min-h-full max-h-full p-4 flex flex-col gap-2">
-              <div className="relative h-5">
-                {/* Connected state */}
-                <div
-                  className={`absolute inset-0 flex items-center gap-2 transition-opacity duration-300 ${
-                    status.state === 'connected' ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                  }`}
-                >
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-xs text-muted-foreground">
-                    Connected to transcription server
-                  </span>
-                </div>
-
-                {/* Connecting state */}
-                <div
-                  className={`absolute inset-0 flex items-center gap-2 transition-opacity duration-300 ${
-                    status.state === 'connecting' ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                  }`}
-                >
-                  <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                  <span className="text-xs text-muted-foreground">
-                    Connecting...
-                  </span>
-                </div>
-
-                {/* Waiting to reconnect state */}
-                <div
-                  className={`absolute inset-0 flex items-center gap-2 transition-opacity duration-300 ${
-                    status.state === 'waiting-to-reconnect' ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                  }`}
-                >
-                  <div className="w-2 h-2 rounded-full bg-orange-500" />
-                  <span className="text-xs text-muted-foreground">
-                    {status.state === 'waiting-to-reconnect' &&
-                      `Attempting reconnection in ${(countdown / 1000).toFixed(1)}s (attempt ${status.attempt})`}
-                  </span>
-                </div>
-
-                {/* Disconnected state */}
-                <div
-                  className={`absolute inset-0 flex items-center gap-2 transition-opacity duration-300 ${
-                    status.state === 'disconnected' ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                  }`}
-                >
-                  <div className="w-2 h-2 rounded-full bg-red-500" />
-                  <span className="text-xs text-muted-foreground">
-                    Disconnected from server
-                  </span>
-                </div>
-              </div>
-              <Card className="mt-2 h-fit w-full overflow-auto">
+              <Card className="h-fit w-full overflow-auto">
                 <h2 className="text-xl font-semibold mb-4">Transcription</h2>
                 <p className="text-sm text-muted-foreground mb-2">
                   This is sample text for the transcription panel. The transcript of
@@ -192,7 +137,7 @@ export const Transcriber: React.FC<TranscriberProps> = ({ videoPath }) => {
             </div>
             <div className="h-full flex justify-center p-4">
               <Card className="w-full h-fit overflow-auto">
-                <Video src={videoPath} className="w-full" />
+                <Video videoId={selectedVideoId ?? undefined} className="w-full" />
               </Card>
             </div>
           </Split>

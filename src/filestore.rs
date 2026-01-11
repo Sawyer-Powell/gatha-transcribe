@@ -28,6 +28,12 @@ pub trait FileStore: Send + Sync {
     /// Get file data by ID
     async fn get_file(&self, file_id: &str) -> Result<Vec<u8>>;
 
+    /// Get file size without loading content
+    async fn get_file_size(&self, file_id: &str) -> Result<u64>;
+
+    /// Get a specific byte range from a file
+    async fn get_file_range(&self, file_id: &str, start: u64, end: u64) -> Result<Vec<u8>>;
+
     /// Delete a file by ID
     async fn delete_file(&self, file_id: &str) -> Result<()>;
 
@@ -107,6 +113,41 @@ impl FileStore for LocalFileStore {
 
         let data = fs::read(&file_path).await?;
         Ok(data)
+    }
+
+    async fn get_file_size(&self, file_id: &str) -> Result<u64> {
+        let file_path = self.get_file_path(file_id);
+
+        if !file_path.exists() {
+            return Err(FileStoreError::NotFound(file_id.to_string()));
+        }
+
+        let metadata = fs::metadata(&file_path).await?;
+        Ok(metadata.len())
+    }
+
+    async fn get_file_range(&self, file_id: &str, start: u64, end: u64) -> Result<Vec<u8>> {
+        use tokio::io::AsyncSeekExt;
+
+        let file_path = self.get_file_path(file_id);
+
+        if !file_path.exists() {
+            return Err(FileStoreError::NotFound(file_id.to_string()));
+        }
+
+        let mut file = fs::File::open(&file_path).await?;
+
+        // Seek to start position
+        file.seek(std::io::SeekFrom::Start(start)).await?;
+
+        // Calculate how many bytes to read
+        let length = (end - start + 1) as usize;
+        let mut buffer = vec![0u8; length];
+
+        // Read exactly the requested range
+        file.read_exact(&mut buffer).await?;
+
+        Ok(buffer)
     }
 
     async fn delete_file(&self, file_id: &str) -> Result<()> {

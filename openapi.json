@@ -14,6 +14,148 @@
     "version": "0.2.0"
   },
   "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login user",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout user",
+        "operationId": "logout",
+        "responses": {
+          "200": {
+            "description": "Logout successful"
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Get current user from token",
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "description": "Current user info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Register a new user",
+        "operationId": "register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "User registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or email already exists"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/videos": {
+      "get": {
+        "tags": [
+          "videos"
+        ],
+        "summary": "Get all videos uploaded by the authenticated user",
+        "operationId": "get_user_videos",
+        "responses": {
+          "200": {
+            "description": "List of videos uploaded by the user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Video"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - authentication required"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/api/videos/upload": {
       "post": {
         "tags": [
@@ -40,8 +182,37 @@
           "400": {
             "description": "Bad request - missing video file or invalid data"
           },
+          "401": {
+            "description": "Unauthorized - authentication required"
+          },
           "500": {
             "description": "Internal server error - failed to save file or database error"
+          }
+        }
+      }
+    },
+    "/api/videos/{id}/stream": {
+      "get": {
+        "tags": [
+          "videos"
+        ],
+        "summary": "Stream a video file with Range request support",
+        "operationId": "stream_video",
+        "responses": {
+          "200": {
+            "description": "Full video file"
+          },
+          "206": {
+            "description": "Partial content (range request)"
+          },
+          "404": {
+            "description": "Video not found"
+          },
+          "416": {
+            "description": "Range not satisfiable"
+          },
+          "500": {
+            "description": "Internal server error"
           }
         }
       }
@@ -66,6 +237,55 @@
   },
   "components": {
     "schemas": {
+      "AuthResponse": {
+        "type": "object",
+        "required": [
+          "user",
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserResponse"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
       "UploadResponse": {
         "type": "object",
         "required": [
@@ -94,6 +314,53 @@
             "minimum": 0
           },
           "name": {
+            "type": "string"
+          }
+        }
+      },
+      "UserResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "Video": {
+        "type": "object",
+        "required": [
+          "id",
+          "file_path",
+          "original_filename",
+          "user_id",
+          "uploaded_at"
+        ],
+        "properties": {
+          "file_path": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "original_filename": {
+            "type": "string"
+          },
+          "uploaded_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user_id": {
             "type": "string"
           }
         }

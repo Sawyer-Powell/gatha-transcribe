@@ -1,16 +1,16 @@
 use axum::{
-    extract::{DefaultBodyLimit, ws::{Message, WebSocket, WebSocketUpgrade}},
-    response::Response,
+    extract::DefaultBodyLimit,
     routing::get,
     Json, Router,
 };
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 use tower_http::{
     cors::CorsLayer,
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
     trace::TraceLayer,
 };
 use tower_cookies::CookieManagerLayer;
+use tracing::info;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 pub mod messages;
@@ -18,8 +18,10 @@ pub mod filestore;
 pub mod db;
 pub mod upload;
 pub mod auth;
+pub mod session_store;
+pub mod websocket;
+pub mod error;
 
-use messages::ServerMessage;
 use upload::AppState;
 
 #[derive(utoipa::ToSchema, serde::Serialize, serde::Deserialize)]
@@ -37,33 +39,12 @@ async fn get_user() -> Json<User> {
     })
 }
 
-async fn ws_handler(ws: WebSocketUpgrade) -> Response {
-    ws.on_upgrade(handle_socket)
-}
-
-async fn handle_socket(mut socket: WebSocket) {
-    // Send a test message every 2 seconds
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(2));
-
-    loop {
-        interval.tick().await;
-
-        let msg = ServerMessage::TestMessage {
-            text: "Hello from Rust!".to_string(),
-        };
-
-        let json = serde_json::to_string(&msg).unwrap();
-
-        if socket.send(Message::Text(json.into())).await.is_err() {
-            break;
-        }
-    }
-}
-
 pub fn create_router(state: Arc<AppState>) -> (axum::Router, utoipa::openapi::OpenApi) {
     let (api_router, api) = OpenApiRouter::new()
         .routes(routes!(get_user))
         .routes(routes!(upload::upload_video))
+        .routes(routes!(upload::get_user_videos))
+        .routes(routes!(upload::stream_video))
         .routes(routes!(auth::register))
         .routes(routes!(auth::login))
         .routes(routes!(auth::logout))
@@ -72,7 +53,7 @@ pub fn create_router(state: Arc<AppState>) -> (axum::Router, utoipa::openapi::Op
 
     let router = Router::new()
         .merge(api_router)
-        .route("/ws", get(ws_handler))
+        .route("/ws/{video_id}", get(crate::websocket::ws_handler))
         // CORS - must be before other middleware to handle preflight requests
         .layer(
             CorsLayer::new()
@@ -93,6 +74,7 @@ pub fn create_router(state: Arc<AppState>) -> (axum::Router, utoipa::openapi::Op
                     axum::http::header::CONTENT_TYPE,
                     axum::http::header::AUTHORIZATION,
                     axum::http::header::ACCEPT,
+                    axum::http::header::RANGE,
                 ])
                 .allow_credentials(true) // Enable for cookies
         )
@@ -130,4 +112,156 @@ pub fn create_router(state: Arc<AppState>) -> (axum::Router, utoipa::openapi::Op
         .with_state(state);
 
     (router, api)
+}
+
+/// Spawn background task to persist sessions to database every 1 second
+pub fn spawn_persistence_task(state: Arc<AppState>) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
+
+        loop {
+            interval.tick().await;
+
+            // Get all sessions from memory
+            let sessions = match state.session_store.list_all().await {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to list sessions");
+                    continue;
+                }
+            };
+
+            // Collect only dirty sessions for persistence
+            let mut dirty_sessions = Vec::new();
+            let mut sessions_to_clean = Vec::new();
+
+            for ((user_id, video_id), session) in sessions {
+                if session.dirty {
+                    match serde_json::to_string(&session) {
+                        Ok(state_json) => {
+                            dirty_sessions.push((user_id.clone(), video_id.clone(), state_json));
+                            // Track which sessions to mark as clean
+                            sessions_to_clean.push(((user_id, video_id), session));
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                user_id = %user_id,
+                                video_id = %video_id,
+                                error = %e,
+                                "Failed to serialize session"
+                            );
+                        }
+                    }
+                }
+            }
+
+            if dirty_sessions.is_empty() {
+                continue; // No dirty sessions, skip persistence
+            }
+
+            // Batch persist all dirty sessions
+            if let Err(e) = state.db.upsert_sessions_batch(dirty_sessions.clone()).await {
+                tracing::error!(
+                    error = %e,
+                    count = dirty_sessions.len(),
+                    "Failed to batch persist sessions"
+                );
+                continue;
+            }
+
+            tracing::debug!(
+                count = dirty_sessions.len(),
+                "Batch persisted dirty sessions"
+            );
+
+            // Mark persisted sessions as clean
+            for (key, mut session) in sessions_to_clean {
+                session.dirty = false;
+                if let Err(e) = state.session_store.set(&key, session).await {
+                    tracing::warn!(
+                        user_id = %key.0,
+                        video_id = %key.1,
+                        error = %e,
+                        "Failed to mark session as clean"
+                    );
+                }
+            }
+        }
+    });
+}
+
+/// Start the gatha-transcribe server
+///
+/// This function initializes all components (database, filestore, session store)
+/// and starts the HTTP server on the specified port.
+///
+/// Returns the server task handle and the app state.
+pub async fn start_server(
+    port: u16,
+    database_url: Option<String>,
+    filestore_path: Option<PathBuf>,
+) -> Result<(tokio::task::JoinHandle<Result<(), std::io::Error>>, Arc<AppState>), Box<dyn std::error::Error>> {
+    use db::Database;
+    use filestore::LocalFileStore;
+    use session_store::InMemorySessionStore;
+
+    // Load environment variables if not provided
+    dotenvy::dotenv().ok();
+
+    let database_url = database_url.unwrap_or_else(|| {
+        std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "sqlite:gatha.db".to_string())
+    });
+
+    let filestore_path = filestore_path.unwrap_or_else(|| {
+        PathBuf::from(
+            std::env::var("FILESTORE_PATH")
+                .unwrap_or_else(|_| "test_filestore".to_string())
+        )
+    });
+
+    // Initialize database
+    info!(database_url = %database_url, "Connecting to database");
+    let db = Database::new(&database_url).await?;
+
+    // Run migrations
+    info!("Running database migrations");
+    db.run_migrations().await?;
+    info!("Database migrations complete");
+
+    // Initialize filestore
+    info!(path = ?filestore_path, "Initializing filestore");
+    let filestore = LocalFileStore::new(filestore_path).await?;
+    info!("Filestore initialized");
+
+    // Initialize session store
+    info!("Initializing session store");
+    let session_store = InMemorySessionStore::new();
+    info!("Session store initialized");
+
+    // Create app state
+    let state = Arc::new(AppState {
+        db,
+        filestore: Arc::new(filestore),
+        session_store: Arc::new(session_store),
+    });
+
+    // Spawn background persistence task
+    info!("Spawning session persistence task");
+    spawn_persistence_task(state.clone());
+
+    let (router, _api) = create_router(state.clone());
+
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+
+    let actual_addr = listener.local_addr()?;
+    info!(%actual_addr, "Server listening");
+
+    // Spawn server task
+    let server_task = tokio::spawn(async move {
+        axum::serve(listener, router).await
+    });
+
+    Ok((server_task, state))
 }

@@ -1,6 +1,6 @@
 use axum::{
-    extract::State,
-    http::StatusCode,
+    extract::{FromRequestParts, State},
+    http::{request::Parts, StatusCode},
     response::IntoResponse,
     Json,
 };
@@ -14,7 +14,7 @@ use tower_cookies::{Cookie, Cookies};
 use utoipa::ToSchema;
 use validator::Validate;
 
-use crate::{db::User, upload::AppState};
+use crate::{db::User, error::AppError, upload::AppState};
 
 // JWT Claims structure
 #[derive(Debug, Serialize, Deserialize)]
@@ -108,6 +108,20 @@ pub fn verify_password(password: &str, hash: &str) -> Result<bool, bcrypt::Bcryp
     verify(password, hash)
 }
 
+/// Create and set an auth cookie with proper security flags
+fn set_auth_cookie(cookies: &Cookies, token: String) {
+    let mut cookie = Cookie::new("auth_token", token);
+    cookie.set_http_only(true);
+    cookie.set_path("/");
+    cookie.set_max_age(tower_cookies::cookie::time::Duration::days(30));
+    // Set secure flag in production
+    if std::env::var("ENVIRONMENT").unwrap_or_default() == "production" {
+        cookie.set_secure(true);
+    }
+    cookie.set_same_site(tower_cookies::cookie::SameSite::Lax);
+    cookies.add(cookie);
+}
+
 /// Register a new user
 #[utoipa::path(
     post,
@@ -124,53 +138,29 @@ pub async fn register(
     State(state): State<Arc<AppState>>,
     cookies: Cookies,
     Json(req): Json<RegisterRequest>,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<impl IntoResponse, AppError> {
     // Validate input
-    req.validate()
-        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Validation error: {}", e)))?;
+    req.validate()?;
 
     // Check if user exists
-    if let Some(_) = state
-        .db
-        .get_user_by_email(&req.email)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-    {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "Email already registered".to_string(),
-        ));
+    if let Some(_) = state.db.get_user_by_email(&req.email).await? {
+        return Err(AppError::BadRequest("Email already registered".to_string()));
     }
 
     // Hash password
-    let hashed_password = hash_password(&req.password)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let hashed_password = hash_password(&req.password)?;
 
     // Create user
     let user = User::new(req.name, req.email, hashed_password);
 
     // Insert into database
-    state
-        .db
-        .insert_user(&user)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    state.db.insert_user(&user).await?;
 
     // Create JWT token
-    let token = create_token(user.id.clone())
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let token = create_token(user.id.clone())?;
 
     // Set HTTP-only cookie
-    let mut cookie = Cookie::new("auth_token", token);
-    cookie.set_http_only(true);
-    cookie.set_path("/");
-    cookie.set_max_age(tower_cookies::cookie::time::Duration::days(30));
-    // Set secure flag in production
-    if std::env::var("ENVIRONMENT").unwrap_or_default() == "production" {
-        cookie.set_secure(true);
-    }
-    cookie.set_same_site(tower_cookies::cookie::SameSite::Lax);
-    cookies.add(cookie);
+    set_auth_cookie(&cookies, token);
 
     Ok((
         StatusCode::OK,
@@ -201,45 +191,33 @@ pub async fn login(
     State(state): State<Arc<AppState>>,
     cookies: Cookies,
     Json(req): Json<LoginRequest>,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<impl IntoResponse, AppError> {
     // Timing attack prevention: randomize delay between 50-200ms
     let delay_ms = rand::thread_rng().gen_range(50..200);
     tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
 
     // Validate input
-    req.validate()
-        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Validation error: {}", e)))?;
+    req.validate()?;
 
     // Get user by email
     let user = state
         .db
         .get_user_by_email(&req.email)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-        .ok_or((StatusCode::UNAUTHORIZED, "Invalid credentials".to_string()))?;
+        .await?
+        .ok_or(AppError::Unauthorized("Invalid credentials".to_string()))?;
 
     // Verify password
-    let password_valid = verify_password(&req.password, &user.hashed_password)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let password_valid = verify_password(&req.password, &user.hashed_password)?;
 
     if !password_valid {
-        return Err((StatusCode::UNAUTHORIZED, "Invalid credentials".to_string()));
+        return Err(AppError::Unauthorized("Invalid credentials".to_string()));
     }
 
     // Create JWT token
-    let token = create_token(user.id.clone())
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let token = create_token(user.id.clone())?;
 
     // Set HTTP-only cookie
-    let mut cookie = Cookie::new("auth_token", token);
-    cookie.set_http_only(true);
-    cookie.set_path("/");
-    cookie.set_max_age(tower_cookies::cookie::time::Duration::days(30));
-    if std::env::var("ENVIRONMENT").unwrap_or_default() == "production" {
-        cookie.set_secure(true);
-    }
-    cookie.set_same_site(tower_cookies::cookie::SameSite::Lax);
-    cookies.add(cookie);
+    set_auth_cookie(&cookies, token);
 
     Ok((
         StatusCode::OK,
@@ -292,28 +270,23 @@ pub async fn logout(cookies: Cookies) -> impl IntoResponse {
 pub async fn me(
     State(state): State<Arc<AppState>>,
     cookies: Cookies,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<impl IntoResponse, AppError> {
     // Get token from cookie
     let token = cookies
         .get("auth_token")
-        .ok_or((
-            StatusCode::UNAUTHORIZED,
-            "Not authenticated".to_string(),
-        ))?
+        .ok_or(AppError::Unauthorized("Not authenticated".to_string()))?
         .value()
         .to_string();
 
     // Verify token
-    let claims = verify_token(&token)
-        .map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid token".to_string()))?;
+    let claims = verify_token(&token)?;
 
     // Get user from database
     let user = state
         .db
         .get_user_by_id(&claims.sub)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-        .ok_or((StatusCode::UNAUTHORIZED, "User not found".to_string()))?;
+        .await?
+        .ok_or(AppError::Unauthorized("User not found".to_string()))?;
 
     Ok((
         StatusCode::OK,
@@ -325,46 +298,36 @@ pub async fn me(
     ))
 }
 
-// Commented out for now - not needed since we use Cookies directly in handlers
-// Can be re-added later if needed for route protection
-// /// Authenticated user extractor for protected routes
-// pub struct AuthUser {
-//     pub user_id: String,
-// }
-//
-// #[async_trait]
-// impl<S> FromRequestParts<S> for AuthUser
-// where
-//     S: Send + Sync,
-// {
-//     type Rejection = (StatusCode, String);
-//
-//     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-//         // Extract cookies from request
-//         let cookies = parts
-//             .extensions
-//             .get::<Cookies>()
-//             .ok_or((
-//                 StatusCode::UNAUTHORIZED,
-//                 "Not authenticated".to_string(),
-//             ))?;
-//
-//         // Get token from cookie
-//         let token = cookies
-//             .get("auth_token")
-//             .ok_or((
-//                 StatusCode::UNAUTHORIZED,
-//                 "Not authenticated".to_string(),
-//             ))?
-//             .value()
-//             .to_string();
-//
-//         // Verify token
-//         let claims = verify_token(&token)
-//             .map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid token".to_string()))?;
-//
-//         Ok(AuthUser {
-//             user_id: claims.sub,
-//         })
-//     }
-// }
+/// Authenticated user extractor for protected routes
+pub struct AuthUser {
+    pub user_id: String,
+}
+
+impl<S> FromRequestParts<S> for AuthUser
+where
+    S: Send + Sync,
+{
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        // Extract cookies from request
+        let cookies = parts
+            .extensions
+            .get::<Cookies>()
+            .ok_or(AppError::Unauthorized("Not authenticated".to_string()))?;
+
+        // Get token from cookie
+        let token = cookies
+            .get("auth_token")
+            .ok_or(AppError::Unauthorized("Not authenticated".to_string()))?
+            .value()
+            .to_string();
+
+        // Verify token
+        let claims = verify_token(&token)?;
+
+        Ok(AuthUser {
+            user_id: claims.sub,
+        })
+    }
+}

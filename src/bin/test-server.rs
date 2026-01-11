@@ -1,4 +1,4 @@
-use gatha_transcribe::{create_router, db::Database, filestore::LocalFileStore, upload::AppState};
+use gatha_transcribe::{create_router, db::Database, filestore::LocalFileStore, session_store::InMemorySessionStore, upload::AppState};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
@@ -15,9 +15,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = tempfile::tempdir()?;
     let filestore = LocalFileStore::new(temp_dir.path().to_path_buf()).await?;
 
+    // Create session store
+    let session_store = InMemorySessionStore::new();
+
     let state = Arc::new(AppState {
         db,
         filestore: Arc::new(filestore),
+        session_store: Arc::new(session_store),
     });
 
     // Get port from env or use 3000

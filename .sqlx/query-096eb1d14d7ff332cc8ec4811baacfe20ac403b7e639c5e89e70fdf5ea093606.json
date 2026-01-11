@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT user_id, video_id, state_json FROM transcription_sessions",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "video_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "state_json",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "096eb1d14d7ff332cc8ec4811baacfe20ac403b7e639c5e89e70fdf5ea093606"
+}
