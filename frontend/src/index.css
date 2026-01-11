@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+@theme {
+  /* Gruvbox Light Color Scheme */
+  --color-background: #fffbeb;
+  --color-foreground: #3c3836;
+
+  --color-card: #fbf1c7;
+  --color-card-foreground: #3c3836;
+
+  --color-popover: #f9f5d7;
+  --color-popover-foreground: #3c3836;
+
+  --color-primary: #458588;
+  --color-primary-foreground: #fbf1c7;
+
+  --color-secondary: #f2e5bc;
+  --color-secondary-foreground: #3c3836;
+
+  --color-muted: #f2e5bc;
+  --color-muted-foreground: #3c3836;
+
+  --color-accent: #d65d0e;
+  --color-accent-foreground: #fbf1c7;
+
+  --color-destructive: #cc241d;
+  --color-destructive-foreground: #fbf1c7;
+
+  --color-border: #928374;
+  --color-input: #928374;
+  --color-ring: #458588;
+
+  /* Additional gruvbox colors */
+  --color-gruvbox-red: #cc241d;
+  --color-gruvbox-green: #98971a;
+  --color-gruvbox-yellow: #d79921;
+  --color-gruvbox-blue: #458588;
+  --color-gruvbox-purple: #b16286;
+  --color-gruvbox-aqua: #689d6a;
+  --color-gruvbox-orange: #d65d0e;
+
+  --radius-sm: 0.25rem;
+  --radius: 0.5rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+
+  /* Transition durations - halved from defaults */
+  --transition-duration: 75ms;
+  --transition-duration-75: 75ms;
+  --transition-duration-100: 100ms;
+  --transition-duration-150: 150ms;
+  --transition-duration-200: 200ms;
+  --transition-duration-300: 300ms;
+}
+
+/* Dark mode variant (optional) */
+.dark {
+  --color-background: #282828;
+  --color-foreground: #fbf1c7;
+
+  --color-card: #282828;
+  --color-card-foreground: #fbf1c7;
+
+  --color-popover: #282828;
+  --color-popover-foreground: #fbf1c7;
+
+  --color-primary: #83a598;
+  --color-primary-foreground: #282828;
+
+  --color-secondary: #504945;
+  --color-secondary-foreground: #fbf1c7;
+
+  --color-muted: #504945;
+  --color-muted-foreground: #a89984;
+
+  --color-accent: #fe8019;
+  --color-accent-foreground: #282828;
+
+  --color-destructive: #fb4934;
+  --color-destructive-foreground: #fbf1c7;
+
+  --color-border: #504945;
+  --color-input: #504945;
+  --color-ring: #83a598;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Safari-specific slider track fix */
+input[type="range"].slider-input::-webkit-slider-runnable-track {
+  background: transparent;
+}
+
+input[type="range"].slider-input::-webkit-slider-thumb {
+  margin-top: -7px;
+}
+
+/* react-split styles */
+.gutter {
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: 50%;
+}
+
+.gutter.gutter-horizontal {
+  cursor: col-resize;
+}
+
+.gutter.gutter-vertical {
+  cursor: row-resize;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  overflow: scroll;
+}
