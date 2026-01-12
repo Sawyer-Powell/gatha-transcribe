@@ -1,8 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { Search, Upload, LogOut, Loader2 } from "lucide-preact";
+import { Search, Upload, LogOut, Loader2, PanelLeftClose } from "lucide-preact";
 import { Button } from "./button";
-import { useLocation } from "preact-iso";
 import { useAppLocalStore } from "../../stores/appLocalStore";
 
 export interface Video {
@@ -20,8 +19,11 @@ export interface SidebarProps {
   isError?: boolean;
   onVideoSelect?: (videoId: string) => void;
   onUpload?: () => void;
+  onLogout?: () => void;
   selectedVideoId?: string;
   className?: string;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -31,29 +33,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isError = false,
   onVideoSelect,
   onUpload,
+  onLogout,
   selectedVideoId,
   className,
+  isCollapsed = false,
+  onToggleCollapse,
 }) => {
   const [searchQuery, setSearchQuery] = React.useState("");
-  const { logout, user } = useAppLocalStore();
-  const location = useLocation();
-
-  const handleLogout = async () => {
-    await logout();
-    location.route('/login');
-  };
+  const { user } = useAppLocalStore();
 
   const filteredVideos = videos.filter((video) =>
     video?.original_filename?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <div className={cn("flex flex-col h-full gap-4 p-4", className)}>
-      <div className="flex-shrink-0">
-        <h2 className="text-xl font-semibold mb-1">{user?.name ?? userName}</h2>
-        <p className="text-sm text-muted-foreground">
-          {videos.length} {videos.length === 1 ? "video" : "videos"}
-        </p>
+    <div className={cn(
+      "flex flex-col h-full gap-4 p-4 transition-opacity duration-300",
+      isCollapsed && "opacity-0 pointer-events-none",
+      className
+    )}>
+      <div className="flex-shrink-0 flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold mb-1">{user?.name ?? userName}</h2>
+          <p className="text-sm text-muted-foreground">
+            {videos.length} {videos.length === 1 ? "video" : "videos"}
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggleCollapse}
+          className="flex-shrink-0 translate-x-3"
+        >
+          <PanelLeftClose className="w-4 h-4" />
+        </Button>
       </div>
 
       <div className="flex-shrink-0 relative">
@@ -105,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           Upload Video
         </Button>
         <Button
-          onClick={handleLogout}
+          onClick={onLogout}
           variant="outline"
           className="w-full"
         >

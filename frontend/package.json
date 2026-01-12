@@ -27,7 +27,6 @@
     "openapi-fetch": "^0.13.4",
     "preact": "^10.27.2",
     "preact-iso": "^2.11.1",
-    "react-split": "^2.0.14",
     "tailwind-merge": "^3.4.0",
     "zustand": "^5.0.9"
   },

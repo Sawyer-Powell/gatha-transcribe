@@ -7,3 +7,6 @@
 .claude
 /.claude
 /test_files
+/.playwright-mcp
+.playwright-mcp
+.playwright-mcp/*

@@ -227,7 +227,7 @@ const VideoComponent = React.forwardRef<HTMLVideoElement, VideoProps>(
       : 56.25; // Default to 16:9
 
     return (
-      <div className={cn("flex flex-col gap-4 min-w-fit", className)}>
+      <div className={cn("flex flex-col gap-4", className)}>
         <div className="relative w-full" style={{ paddingBottom: `${aspectRatio}%` }}>
           {/* Loading skeleton */}
           <div className={cn(

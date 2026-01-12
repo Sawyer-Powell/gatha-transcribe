@@ -14,7 +14,7 @@ interface User {
 interface AppLocalState {
   // UI State (persisted to localStorage)
   selectedVideoId: string | null;
-  splitSizes: [number, number];
+  isSidebarCollapsed: boolean;
 
   // Auth State (not persisted - auth via HTTP-only cookies)
   user: User | null;
@@ -26,7 +26,7 @@ interface AppLocalState {
 interface AppLocalActions {
   // UI Actions
   setSelectedVideoId: (videoId: string | null) => void;
-  setSplitSizes: (sizes: [number, number]) => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
 
   // Auth Actions
   setUser: (user: User | null) => void;
@@ -44,7 +44,6 @@ export type AppLocalStore = AppLocalState & AppLocalActions;
 // Constants
 // ============================================================================
 
-const DEFAULT_SPLIT_SIZES: [number, number] = [70, 30];
 const API_BASE_URL = 'http://localhost:3000';
 
 // ============================================================================
@@ -56,7 +55,7 @@ export const useAppLocalStore = create<AppLocalStore>()(
     (set) => ({
       // UI State
       selectedVideoId: null,
-      splitSizes: DEFAULT_SPLIT_SIZES,
+      isSidebarCollapsed: false,
 
       // Auth State
       user: null,
@@ -66,7 +65,7 @@ export const useAppLocalStore = create<AppLocalStore>()(
 
       // UI Actions
       setSelectedVideoId: (videoId) => set({ selectedVideoId: videoId }),
-      setSplitSizes: (sizes) => set({ splitSizes: sizes }),
+      setSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
 
       // Auth Actions
       setUser: (user) => set({ user }),
@@ -155,7 +154,7 @@ export const useAppLocalStore = create<AppLocalStore>()(
       // Only persist UI state, not auth state (auth via cookies)
       partialize: (state) => ({
         selectedVideoId: state.selectedVideoId,
-        splitSizes: state.splitSizes,
+        isSidebarCollapsed: state.isSidebarCollapsed,
       }),
     }
   )
@@ -169,4 +168,4 @@ export const selectUser = (s: AppLocalStore) => s.user;
 export const selectIsAuthenticated = (s: AppLocalStore) => s.user !== null;
 export const selectIsInitialized = (s: AppLocalStore) => s.isInitialized;
 export const selectSelectedVideoId = (s: AppLocalStore) => s.selectedVideoId;
-export const selectSplitSizes = (s: AppLocalStore) => s.splitSizes;
+export const selectIsSidebarCollapsed = (s: AppLocalStore) => s.isSidebarCollapsed;
