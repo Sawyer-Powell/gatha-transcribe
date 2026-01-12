@@ -3,7 +3,7 @@ import { useEffect } from 'preact/hooks';
 import { Router, Route, LocationProvider } from 'preact-iso';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { useAuthStore } from './stores/authStore';
+import { useAppLocalStore } from './stores/appLocalStore';
 import './app.css';
 
 // Create a client
@@ -43,7 +43,7 @@ const NotFound = () => (
 );
 
 export function App() {
-  const checkAuth = useAuthStore(state => state.checkAuth);
+  const checkAuth = useAppLocalStore(state => state.checkAuth);
 
   // Check auth once when app loads
   useEffect(() => {

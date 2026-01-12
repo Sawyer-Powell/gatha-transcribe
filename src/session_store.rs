@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -24,9 +23,22 @@ pub struct TranscriptionSession {
     pub user_id: String,
     pub video_id: String,
     pub current_time: f64,
-    pub updated_at: DateTime<Utc>,
+    #[serde(default = "default_playback_speed")]
+    pub playback_speed: f64,
+    #[serde(default = "default_volume")]
+    pub volume: f64,
+    #[serde(default)]
+    pub version: i64, // Monotonic counter for conflict resolution
     #[serde(skip)]
     pub dirty: bool, // Track if changed since last persist
+}
+
+fn default_playback_speed() -> f64 {
+    1.0
+}
+
+fn default_volume() -> f64 {
+    1.0
 }
 
 /// Trait for storing and retrieving transcription sessions
@@ -104,7 +116,9 @@ mod tests {
             user_id: "user1".to_string(),
             video_id: "video1".to_string(),
             current_time: 42.5,
-            updated_at: Utc::now(),
+            playback_speed: 1.5,
+            volume: 0.8,
+            version: 1,
             dirty: false,
         };
         store.set(&key, session.clone()).await.unwrap();

@@ -12,6 +12,9 @@ pub struct Video {
     pub user_id: String,
     #[schema(value_type = String, format = DateTime)]
     pub uploaded_at: DateTime<Utc>,
+    pub width: Option<i64>,
+    pub height: Option<i64>,
+    pub duration_seconds: Option<f64>,
 }
 
 impl Video {
@@ -22,6 +25,9 @@ impl Video {
             original_filename,
             user_id,
             uploaded_at: Utc::now(),
+            width: None,
+            height: None,
+            duration_seconds: None,
         }
     }
 }
@@ -74,12 +80,15 @@ impl Database {
     /// Insert a new video record
     pub async fn insert_video(&self, video: &Video) -> Result<(), sqlx::Error> {
         sqlx::query!(
-            "INSERT INTO videos (id, file_path, original_filename, user_id, uploaded_at) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO videos (id, file_path, original_filename, user_id, uploaded_at, width, height, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             video.id,
             video.file_path,
             video.original_filename,
             video.user_id,
-            video.uploaded_at
+            video.uploaded_at,
+            video.width,
+            video.height,
+            video.duration_seconds
         )
         .execute(&self.pool)
         .await?;
@@ -90,7 +99,7 @@ impl Database {
     pub async fn get_video(&self, id: &str) -> Result<Option<Video>, sqlx::Error> {
         let video = sqlx::query_as!(
             Video,
-            r#"SELECT id, file_path, original_filename, user_id, uploaded_at as "uploaded_at: _" FROM videos WHERE id = ?"#,
+            r#"SELECT id, file_path, original_filename, user_id, uploaded_at as "uploaded_at: _", width, height, duration_seconds FROM videos WHERE id = ?"#,
             id
         )
         .fetch_optional(&self.pool)
@@ -102,7 +111,7 @@ impl Database {
     pub async fn list_videos(&self) -> Result<Vec<Video>, sqlx::Error> {
         let videos = sqlx::query_as!(
             Video,
-            r#"SELECT id, file_path, original_filename, user_id, uploaded_at as "uploaded_at: _" FROM videos ORDER BY uploaded_at DESC"#
+            r#"SELECT id, file_path, original_filename, user_id, uploaded_at as "uploaded_at: _", width, height, duration_seconds FROM videos ORDER BY uploaded_at DESC"#
         )
         .fetch_all(&self.pool)
         .await?;
@@ -113,7 +122,7 @@ impl Database {
     pub async fn get_videos_by_user(&self, user_id: &str) -> Result<Vec<Video>, sqlx::Error> {
         let videos = sqlx::query_as!(
             Video,
-            r#"SELECT id, file_path, original_filename, user_id, uploaded_at as "uploaded_at: _" FROM videos WHERE user_id = ? ORDER BY uploaded_at DESC"#,
+            r#"SELECT id, file_path, original_filename, user_id, uploaded_at as "uploaded_at: _", width, height, duration_seconds FROM videos WHERE user_id = ? ORDER BY uploaded_at DESC"#,
             user_id
         )
         .fetch_all(&self.pool)

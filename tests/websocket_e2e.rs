@@ -67,39 +67,55 @@ async fn test_websocket_sends_state_sync_on_connect() {
     let (ws_stream, _) = connect_async(ws_request).await.unwrap();
     let (_write, mut read) = ws_stream.split();
 
-    // Wait for StateSync message
-    let msg = tokio::time::timeout(
-        tokio::time::Duration::from_secs(2),
-        read.next()
-    )
-    .await
-    .expect("Timeout waiting for StateSync")
-    .expect("WebSocket closed")
-    .expect("WebSocket error");
+    // Wait for initial messages (VideoMetadata and StateSync)
+    let mut video_metadata_received = false;
+    let mut state_sync_received = false;
 
-    // Verify message structure
-    if let Message::Text(text) = msg {
-        let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
+    for _ in 0..3 {
+        let msg = tokio::time::timeout(
+            tokio::time::Duration::from_secs(2),
+            read.next()
+        )
+        .await
+        .expect("Timeout waiting for messages")
+        .expect("WebSocket closed")
+        .expect("WebSocket error");
 
-        // Verify it's a StateSync message
-        assert_eq!(parsed["type"], "StateSync");
+        if let Message::Text(text) = msg {
+            let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
 
-        // Verify session structure
-        let session = &parsed["session"];
-        assert!(session.is_object(), "session should be an object");
+            match parsed["type"].as_str() {
+                Some("VideoMetadata") => {
+                    video_metadata_received = true;
+                    println!("✓ VideoMetadata received");
+                }
+                Some("StateSync") => {
+                    state_sync_received = true;
 
-        // Verify current_time field exists and is a number
-        assert!(session["current_time"].is_f64() || session["current_time"].is_i64(),
-                "current_time should be a number");
+                    // Verify session structure
+                    let session = &parsed["session"];
+                    assert!(session.is_object(), "session should be an object");
 
-        // For new session, current_time should be 0
-        assert_eq!(session["current_time"].as_f64().unwrap(), 0.0);
+                    // Verify current_time field exists and is a number
+                    assert!(session["current_time"].is_f64() || session["current_time"].is_i64(),
+                            "current_time should be a number");
 
-        println!("✓ StateSync message verified:");
-        println!("  Format: {}", serde_json::to_string_pretty(&parsed).unwrap());
-    } else {
-        panic!("Expected text message, got binary");
+                    // For new session, current_time should be 0
+                    assert_eq!(session["current_time"].as_f64().unwrap(), 0.0);
+
+                    println!("✓ StateSync message verified:");
+                    println!("  Format: {}", serde_json::to_string_pretty(&parsed).unwrap());
+                }
+                _ => {}
+            }
+        }
+
+        if video_metadata_received && state_sync_received {
+            break;
+        }
     }
+
+    assert!(state_sync_received, "Should have received StateSync message");
 }
 
 #[tokio::test]
@@ -164,13 +180,16 @@ async fn test_websocket_receives_playback_update() {
     let (ws_stream, _) = connect_async(ws_request).await.unwrap();
     let (mut write, mut read) = ws_stream.split();
 
-    // Read initial StateSync
-    let _ = read.next().await.unwrap().unwrap();
+    // Read initial messages (VideoMetadata and StateSync)
+    for _ in 0..2 {
+        let _ = read.next().await.unwrap().unwrap();
+    }
 
-    // Send playback position update
+    // Send playback position update with correct format
     let update = serde_json::json!({
         "type": "UpdatePlaybackPosition",
-        "current_time": 42.5
+        "current_time": 42.5,
+        "version": 1
     });
     write.send(Message::Text(update.to_string().into())).await.unwrap();
 
@@ -190,6 +209,7 @@ async fn test_websocket_receives_playback_update() {
         .expect("Session should exist in session store");
 
     assert_eq!(session.current_time, 42.5);
+    assert_eq!(session.version, 1);
 
     println!("✓ Playback update received and stored in session store");
 }

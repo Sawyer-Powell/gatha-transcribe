@@ -1,6 +1,6 @@
 import { useEffect } from 'preact/hooks';
 import { useLocation } from 'preact-iso';
-import { useAuthStore } from '../stores/authStore';
+import { useAppLocalStore } from '../stores/appLocalStore';
 import type { ComponentChildren } from 'preact';
 
 interface ProtectedRouteProps {
@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { user, isInitialized } = useAuthStore();
+  const { user, isInitialized } = useAppLocalStore();
   const location = useLocation();
 
   // Redirect to login if not authenticated (after initialization is complete)

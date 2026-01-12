@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { Search, Upload, LogOut, Loader2 } from "lucide-preact";
 import { Button } from "./button";
 import { useLocation } from "preact-iso";
-import { useAuthStore } from "../../stores/authStore";
+import { useAppLocalStore } from "../../stores/appLocalStore";
 
 export interface Video {
   id: string;
@@ -35,7 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   className,
 }) => {
   const [searchQuery, setSearchQuery] = React.useState("");
-  const { logout, user } = useAuthStore();
+  const { logout, user } = useAppLocalStore();
   const location = useLocation();
 
   const handleLogout = async () => {

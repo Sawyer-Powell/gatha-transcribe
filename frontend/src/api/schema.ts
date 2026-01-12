@@ -171,12 +171,18 @@ export interface components {
             name: string;
         };
         Video: {
+            /** Format: double */
+            duration_seconds?: number | null;
             file_path: string;
+            /** Format: int64 */
+            height?: number | null;
             id: string;
             original_filename: string;
             /** Format: date-time */
             uploaded_at: string;
             user_id: string;
+            /** Format: int64 */
+            width?: number | null;
         };
     };
     responses: never;

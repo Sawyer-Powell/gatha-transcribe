@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { useLocation } from 'preact-iso';
-import { useAuthStore } from '../stores/authStore';
+import { useAppLocalStore } from '../stores/appLocalStore';
 import { Button } from '../components/ui/button';
 
 export const LoginPage = () => {
@@ -8,7 +8,7 @@ export const LoginPage = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, register, error, isLoading } = useAuthStore();
+  const { login, register, error, isLoading } = useAppLocalStore();
   const location = useLocation();
 
   const handleSubmit = async (e: Event) => {

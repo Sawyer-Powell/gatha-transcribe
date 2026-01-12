@@ -1,6 +1,6 @@
 use gatha_transcribe::{
     create_router,
-    messages::ServerMessage,
+    messages::{ClientMessage, SessionState, PlaybackUpdate, PlaybackSpeedUpdate, VolumeUpdate, ServerMessage},
     db::Database,
     filestore::LocalFileStore,
     session_store::InMemorySessionStore,
@@ -13,6 +13,11 @@ use std::{fs, path::PathBuf, sync::Arc};
 async fn main() {
     println!("Generating TypeScript types from Rust structs...");
     ServerMessage::export().expect("Failed to export ServerMessage");
+    SessionState::export().expect("Failed to export SessionState");
+    PlaybackUpdate::export().expect("Failed to export PlaybackUpdate");
+    PlaybackSpeedUpdate::export().expect("Failed to export PlaybackSpeedUpdate");
+    VolumeUpdate::export().expect("Failed to export VolumeUpdate");
+    ClientMessage::export().expect("Failed to export ClientMessage");
     println!("✓ TypeScript types generated in frontend/src/types/");
 
     println!("\nGenerating OpenAPI spec...");

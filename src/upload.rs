@@ -33,17 +33,18 @@ pub struct AppState {
     pub session_store: Arc<dyn SessionStore>,
 }
 
-/// Process MP4 video to optimize for streaming (move moov atom to beginning)
+/// Process MP4 video to optimize for streaming and extract metadata
 /// Uses ffmpeg with -movflags +faststart to reorganize the file
 /// Works with any FileStore implementation by using temp files
+/// Returns (width, height, duration_seconds)
 async fn process_video_for_streaming(
     filestore: &Arc<dyn FileStore>,
     file_id: &str,
-) -> Result<(), AppError> {
+) -> Result<(Option<i64>, Option<i64>, Option<f64>), AppError> {
     // Only process MP4 files
     if !file_id.ends_with(".mp4") && !file_id.ends_with(".MP4") {
         info!(file_id = file_id, "Skipping video processing for non-MP4 file");
-        return Ok(());
+        return Ok((None, None, None));
     }
 
     let process_start = Instant::now();
@@ -107,12 +108,15 @@ async fn process_video_for_streaming(
         );
         // Clean up output temp file if it exists
         let _ = tokio::fs::remove_file(&temp_output).await;
-        return Ok(()); // Don't fail upload, just skip processing
+        return Ok((None, None, None)); // Don't fail upload, just skip processing
     }
 
-    info!(file_id = file_id, "ffmpeg processing succeeded, reading output file");
+    info!(file_id = file_id, "ffmpeg processing succeeded, extracting metadata");
 
-    // Step 3: Read processed file and save back to FileStore
+    // Step 3: Extract metadata from the processed file
+    let (width, height, duration_seconds) = extract_metadata_from_file(&temp_output).await?;
+
+    // Step 4: Read processed file and save back to FileStore
     let processed_data = tokio::fs::read(&temp_output).await
         .map_err(|e| {
             error!(error = %e, file_id = file_id, "Failed to read processed file");
@@ -141,11 +145,95 @@ async fn process_video_for_streaming(
     let process_duration = process_start.elapsed();
     info!(
         file_id = file_id,
-        duration_ms = process_duration.as_millis(),
+        width = ?width,
+        height = ?height,
+        duration_seconds = ?duration_seconds,
+        process_duration_ms = process_duration.as_millis(),
         "Video processing completed successfully"
     );
 
-    Ok(())
+    Ok((width, height, duration_seconds))
+}
+
+#[derive(Debug, Deserialize)]
+struct FfprobeFormat {
+    duration: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct FfprobeStream {
+    width: Option<i64>,
+    height: Option<i64>,
+    codec_type: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct FfprobeOutput {
+    format: Option<FfprobeFormat>,
+    streams: Option<Vec<FfprobeStream>>,
+}
+
+/// Extract video metadata from a file path using ffprobe
+async fn extract_metadata_from_file(file_path: &str) -> Result<(Option<i64>, Option<i64>, Option<f64>), AppError> {
+    info!(file_path = file_path, "Extracting video metadata with ffprobe");
+
+    // Run ffprobe to get metadata
+    let output = Command::new("ffprobe")
+        .args(&[
+            "-v", "quiet",
+            "-print_format", "json",
+            "-show_format",
+            "-show_streams",
+            file_path,
+        ])
+        .output()
+        .await
+        .map_err(|e| {
+            error!(error = %e, file_path = file_path, "Failed to execute ffprobe");
+            AppError::Internal(format!("Metadata extraction failed: {}", e))
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        warn!(
+            file_path = file_path,
+            stderr = %stderr,
+            "ffprobe failed, continuing without metadata"
+        );
+        return Ok((None, None, None));
+    }
+
+    // Parse ffprobe output
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let probe_output: FfprobeOutput = serde_json::from_str(&stdout)
+        .map_err(|e| {
+            warn!(error = %e, file_path = file_path, "Failed to parse ffprobe output");
+            AppError::Internal(format!("Failed to parse metadata: {}", e))
+        })?;
+
+    // Extract duration from format
+    let duration = probe_output.format
+        .and_then(|f| f.duration)
+        .and_then(|d| d.parse::<f64>().ok());
+
+    // Extract width and height from first video stream
+    let (width, height) = probe_output.streams
+        .and_then(|streams| {
+            streams.iter()
+                .find(|s| s.codec_type.as_deref() == Some("video"))
+                .map(|s| (s.width, s.height))
+        })
+        .unwrap_or((None, None));
+
+    info!(
+        file_path = file_path,
+        width = ?width,
+        height = ?height,
+        duration = ?duration,
+        "Video metadata extracted"
+    );
+
+    Ok((width, height, duration))
 }
 
 /// Handle video upload
@@ -261,9 +349,9 @@ pub async fn upload_video(
                 AppError::BadRequest(format!("Upload failed: {}", e))
             })?;
 
-            // Process video to optimize for streaming (move moov atom to beginning)
+            // Process video to optimize for streaming and extract metadata in one pass
             // This works with any FileStore implementation (local, S3, etc.)
-            process_video_for_streaming(&state.filestore, &file_path).await?;
+            let (width, height, duration_seconds) = process_video_for_streaming(&state.filestore, &file_path).await?;
 
             // Create video record with the same UUID used for file path
             let video = Video {
@@ -272,6 +360,9 @@ pub async fn upload_video(
                 original_filename: original_filename.clone(),
                 user_id: auth_user.user_id.clone(),
                 uploaded_at: chrono::Utc::now(),
+                width,
+                height,
+                duration_seconds,
             };
 
             // Save video metadata to database

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, file_path, original_filename, user_id, uploaded_at as \"uploaded_at: _\" FROM videos WHERE id = ?",
+  "query": "SELECT id, file_path, original_filename, user_id, uploaded_at as \"uploaded_at: _\", width, height, duration_seconds FROM videos WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -27,6 +27,21 @@
         "name": "uploaded_at: _",
         "ordinal": 4,
         "type_info": "Text"
+      },
+      {
+        "name": "width",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "height",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "duration_seconds",
+        "ordinal": 7,
+        "type_info": "Float"
       }
     ],
     "parameters": {
@@ -37,8 +52,11 @@
       false,
       false,
       false,
-      false
+      false,
+      true,
+      true,
+      true
     ]
   },
-  "hash": "b5eed3dadb9ec958534df0d8246d8ff0ce2687a333e37cbe5e3204207bcdf761"
+  "hash": "e551a85440544691fc7476a3cad000221a2a61ac4785389cc68a295fe1e9d351"
 }

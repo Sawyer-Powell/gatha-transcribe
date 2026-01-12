@@ -8,7 +8,7 @@ import { GripVertical, ChevronLeft, ChevronRight } from "lucide-preact";
 import { render } from "preact";
 import { UploadVideoModal } from "@/components/UploadVideoModal";
 import { useVideos } from "@/hooks/useVideos";
-import { useTranscriberStore } from "@/stores/transcriberStore";
+import { useAppLocalStore } from "@/stores/appLocalStore";
 
 export interface TranscriberProps {}
 
@@ -16,11 +16,11 @@ export const Transcriber: React.FC<TranscriberProps> = () => {
   const [sidebarVisible, setSidebarVisible] = React.useState(true);
   const [uploadModalOpen, setUploadModalOpen] = React.useState(false);
 
-  // Transcriber store for persisted state
-  const selectedVideoId = useTranscriberStore((state) => state.selectedVideoId);
-  const setSelectedVideoId = useTranscriberStore((state) => state.setSelectedVideoId);
-  const splitSizes = useTranscriberStore((state) => state.splitSizes) || [70, 30];
-  const setSplitSizes = useTranscriberStore((state) => state.setSplitSizes);
+  // App store for persisted state
+  const selectedVideoId = useAppLocalStore((state) => state.selectedVideoId);
+  const setSelectedVideoId = useAppLocalStore((state) => state.setSelectedVideoId);
+  const splitSizes = useAppLocalStore((state) => state.splitSizes) || [70, 30];
+  const setSplitSizes = useAppLocalStore((state) => state.setSplitSizes);
 
   // Fetch videos from server
   const { data: videos = [], isLoading, isError, refetch } = useVideos();

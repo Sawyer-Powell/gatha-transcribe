@@ -1,40 +1,57 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /// <reference types="@testing-library/jest-dom" />
-/* @jsx h */
-import { h } from 'preact';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/preact';
 import { App } from './app';
 
-// Mock components with navigation capabilities
-vi.mock('./pages/LoginPage', () => ({
-  LoginPage: () => {
-    return (
-      <div data-testid="login-page">
-        <h1>Login Page</h1>
-        <a href="/">Go to Home</a>
-      </div>
-    );
-  },
-}));
-
-vi.mock('./features/transcriber', () => ({
-  Transcriber: () => <div data-testid="transcriber">Transcriber Page</div>,
-}));
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+declare const require: (module: string) => any;
 
 // Create a mock store that we can control
 let mockUser: any = null;
 let mockIsInitialized = true;
 const mockCheckAuth = vi.fn();
 
-vi.mock('./stores/authStore', () => ({
-  useAuthStore: (selector: any) => {
+// Mock react-query to avoid React hook issues
+vi.mock('@tanstack/react-query', () => {
+  class MockQueryClient {}
+  return {
+    QueryClient: MockQueryClient,
+    QueryClientProvider: ({ children }: { children: any }) => children,
+    useQuery: () => ({ data: [], isLoading: false, isError: false, refetch: () => {} }),
+    useMutation: () => ({ mutate: () => {}, isLoading: false }),
+  };
+});
+
+// Mock components
+vi.mock('./pages/LoginPage', () => ({
+  LoginPage: function MockLoginPage() {
+    const { h } = require('preact');
+    return h('div', { 'data-testid': 'login-page' },
+      h('h1', null, 'Login Page'),
+      h('a', { href: '/' }, 'Go to Home')
+    );
+  },
+}));
+
+vi.mock('./features/transcriber', () => ({
+  Transcriber: function MockTranscriber() {
+    const { h } = require('preact');
+    return h('div', { 'data-testid': 'transcriber' }, 'Transcriber Page');
+  },
+}));
+
+vi.mock('./stores/appLocalStore', () => ({
+  useAppLocalStore: (selector: any) => {
     const store = {
       checkAuth: mockCheckAuth,
       user: mockUser,
       isInitialized: mockIsInitialized,
       isLoading: false,
       error: null,
+      selectedVideoId: null,
+      splitSizes: [70, 30],
+      setSelectedVideoId: vi.fn(),
+      setSplitSizes: vi.fn(),
     };
     return selector ? selector(store) : store;
   },

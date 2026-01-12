@@ -5,25 +5,16 @@ use axum::{
     },
     response::Response,
 };
-use chrono::Utc;
 use futures_util::sink::SinkExt;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
 use crate::{
     auth::AuthUser,
-    messages::ServerMessage,
+    messages::{ClientMessage, ServerMessage, SessionState},
     session_store::{SessionKey, TranscriptionSession},
     upload::AppState,
 };
-
-/// Client message types
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type")]
-enum ClientMessage {
-    UpdatePlaybackPosition { current_time: f64 },
-}
 
 /// WebSocket handler with auth and video_id
 pub async fn ws_handler(
@@ -69,6 +60,41 @@ async fn handle_socket(
             return;
         }
     };
+
+    // Get video metadata from database
+    let video = match state.db.get_video(&video_id).await {
+        Ok(Some(v)) => v,
+        Ok(None) => {
+            error!(
+                user_id = %user_id,
+                video_id = %video_id,
+                "Video not found"
+            );
+            let _ = socket.close().await;
+            return;
+        }
+        Err(e) => {
+            error!(
+                user_id = %user_id,
+                video_id = %video_id,
+                error = %e,
+                "Failed to get video"
+            );
+            let _ = socket.close().await;
+            return;
+        }
+    };
+
+    // Send video metadata to client (for immediate sizing)
+    if let Err(e) = send_video_metadata(&mut socket, &video).await {
+        error!(
+            user_id = %user_id,
+            video_id = %video_id,
+            error = %e,
+            "Failed to send video metadata"
+        );
+        return;
+    }
 
     // Send initial state to client
     if let Err(e) = send_state_sync(&mut socket, &session).await {
@@ -245,7 +271,9 @@ async fn load_or_create_session(
         user_id: user_id.clone(),
         video_id: video_id.clone(),
         current_time: 0.0,
-        updated_at: Utc::now(),
+        playback_speed: 1.0,
+        volume: 1.0,
+        version: 0,
         dirty: false, // New session, not dirty yet
     };
 
@@ -265,24 +293,37 @@ async fn load_or_create_session(
     Ok(session)
 }
 
+/// Send video metadata to client
+async fn send_video_metadata(
+    socket: &mut WebSocket,
+    video: &crate::db::Video,
+) -> Result<(), String> {
+    let msg = ServerMessage::VideoMetadata {
+        width: video.width,
+        height: video.height,
+        duration_seconds: video.duration_seconds,
+    };
+
+    let json = serde_json::to_string(&msg).map_err(|e| format!("JSON error: {}", e))?;
+
+    socket
+        .send(Message::Text(json.into()))
+        .await
+        .map_err(|e| format!("Send error: {}", e))
+}
+
 /// Send state sync to client
 async fn send_state_sync(
     socket: &mut WebSocket,
     session: &TranscriptionSession,
 ) -> Result<(), String> {
-    #[derive(Serialize)]
-    struct StateSyncMessage {
-        current_time: f64,
-    }
-
-    let session_data = StateSyncMessage {
-        current_time: session.current_time,
-    };
-
-    let session_value = serde_json::to_value(session_data).map_err(|e| format!("JSON error: {}", e))?;
-
     let msg = ServerMessage::StateSync {
-        session: session_value,
+        session: SessionState {
+            current_time: session.current_time,
+            playback_speed: session.playback_speed,
+            volume: session.volume,
+            version: session.version,
+        },
     };
 
     let json = serde_json::to_string(&msg).map_err(|e| format!("JSON error: {}", e))?;
@@ -303,7 +344,7 @@ async fn handle_text_message(
         serde_json::from_str(text).map_err(|e| format!("Parse error: {}", e))?;
 
     match msg {
-        ClientMessage::UpdatePlaybackPosition { current_time } => {
+        ClientMessage::UpdatePlaybackPosition(playback) => {
             // Get current session
             let mut session = state
                 .session_store
@@ -312,10 +353,117 @@ async fn handle_text_message(
                 .map_err(|e| format!("Store error: {}", e))?
                 .ok_or_else(|| "Session not found".to_string())?;
 
-            // Update playback position
-            session.current_time = current_time;
-            session.updated_at = Utc::now();
-            session.dirty = true; // Mark as dirty for persistence
+            // Only apply update if client version is newer
+            if playback.version >= session.version {
+                session.current_time = playback.current_time;
+                session.version = playback.version;
+                session.dirty = true;
+
+                state
+                    .session_store
+                    .set(session_key, session)
+                    .await
+                    .map_err(|e| format!("Store error: {}", e))?;
+
+                info!(
+                    user_id = %session_key.0,
+                    video_id = %session_key.1,
+                    current_time = %playback.current_time,
+                    version = %playback.version,
+                    "Updated playback position"
+                );
+            }
+
+            Ok(())
+        }
+
+        ClientMessage::UpdatePlaybackSpeed(update) => {
+            let mut session = state
+                .session_store
+                .get(session_key)
+                .await
+                .map_err(|e| format!("Store error: {}", e))?
+                .ok_or_else(|| "Session not found".to_string())?;
+
+            if update.version >= session.version {
+                session.playback_speed = update.playback_speed;
+                session.version = update.version;
+                session.dirty = true;
+
+                state
+                    .session_store
+                    .set(session_key, session)
+                    .await
+                    .map_err(|e| format!("Store error: {}", e))?;
+
+                info!(
+                    user_id = %session_key.0,
+                    video_id = %session_key.1,
+                    playback_speed = %update.playback_speed,
+                    version = %update.version,
+                    "Updated playback speed"
+                );
+            }
+
+            Ok(())
+        }
+
+        ClientMessage::UpdateVolume(update) => {
+            let mut session = state
+                .session_store
+                .get(session_key)
+                .await
+                .map_err(|e| format!("Store error: {}", e))?
+                .ok_or_else(|| "Session not found".to_string())?;
+
+            if update.version >= session.version {
+                session.volume = update.volume;
+                session.version = update.version;
+                session.dirty = true;
+
+                state
+                    .session_store
+                    .set(session_key, session)
+                    .await
+                    .map_err(|e| format!("Store error: {}", e))?;
+
+                info!(
+                    user_id = %session_key.0,
+                    video_id = %session_key.1,
+                    volume = %update.volume,
+                    version = %update.version,
+                    "Updated volume"
+                );
+            }
+
+            Ok(())
+        }
+
+        ClientMessage::SyncState(client_state) => {
+            // Authoritative sync from client - always accept (client won conflict resolution)
+            let mut session = state
+                .session_store
+                .get(session_key)
+                .await
+                .map_err(|e| format!("Store error: {}", e))?
+                .ok_or_else(|| "Session not found".to_string())?;
+
+            info!(
+                user_id = %session_key.0,
+                video_id = %session_key.1,
+                current_time = %client_state.current_time,
+                playback_speed = %client_state.playback_speed,
+                volume = %client_state.volume,
+                version = %client_state.version,
+                old_version = %session.version,
+                "Accepting authoritative state sync from client"
+            );
+
+            session.current_time = client_state.current_time;
+            session.playback_speed = client_state.playback_speed;
+            session.volume = client_state.volume;
+            session.version = client_state.version;
+            session.dirty = true;
 
             // Store updated session
             state
@@ -323,13 +471,6 @@ async fn handle_text_message(
                 .set(session_key, session)
                 .await
                 .map_err(|e| format!("Store error: {}", e))?;
-
-            info!(
-                user_id = %session_key.0,
-                video_id = %session_key.1,
-                current_time = %current_time,
-                "Updated playback position"
-            );
 
             Ok(())
         }
