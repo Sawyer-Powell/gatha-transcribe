@@ -15,6 +15,7 @@ interface AppLocalState {
   // UI State (persisted to localStorage)
   selectedVideoId: string | null;
   isSidebarCollapsed: boolean;
+  theme: 'light' | 'dark';
 
   // Auth State (not persisted - auth via HTTP-only cookies)
   user: User | null;
@@ -27,6 +28,7 @@ interface AppLocalActions {
   // UI Actions
   setSelectedVideoId: (videoId: string | null) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  toggleTheme: () => void;
 
   // Auth Actions
   setUser: (user: User | null) => void;
@@ -56,6 +58,7 @@ export const useAppLocalStore = create<AppLocalStore>()(
       // UI State
       selectedVideoId: null,
       isSidebarCollapsed: false,
+      theme: 'light',
 
       // Auth State
       user: null,
@@ -66,6 +69,16 @@ export const useAppLocalStore = create<AppLocalStore>()(
       // UI Actions
       setSelectedVideoId: (videoId) => set({ selectedVideoId: videoId }),
       setSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
+      toggleTheme: () => set((state) => {
+        const newTheme = state.theme === 'light' ? 'dark' : 'light';
+        // Apply theme to document
+        if (newTheme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+        return { theme: newTheme };
+      }),
 
       // Auth Actions
       setUser: (user) => set({ user }),
@@ -155,6 +168,7 @@ export const useAppLocalStore = create<AppLocalStore>()(
       partialize: (state) => ({
         selectedVideoId: state.selectedVideoId,
         isSidebarCollapsed: state.isSidebarCollapsed,
+        theme: state.theme,
       }),
     }
   )

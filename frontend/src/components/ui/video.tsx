@@ -2,6 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Rabbit, Volume2, Play, Pause } from "lucide-preact";
 import {
   useVideoSessionStore,
@@ -14,10 +15,15 @@ import {
 
 export interface VideoProps extends Omit<React.HTMLAttributes<HTMLVideoElement>, 'src'> {
   videoId?: string;
+  onPlaybackTimeChange?: (time: number) => void;
 }
 
-const VideoComponent = React.forwardRef<HTMLVideoElement, VideoProps>(
-  ({ className, videoId, ...props }, ref) => {
+export interface VideoHandle {
+  seekTo: (time: number) => void;
+}
+
+const VideoComponent = React.forwardRef<VideoHandle, VideoProps>(
+  ({ className, videoId, onPlaybackTimeChange, ...props }, ref) => {
     // Local UI state (not synced to server)
     const [isPlaying, setIsPlaying] = React.useState(false);
     const [displayTime, setDisplayTime] = React.useState(0); // For smooth slider during seek
@@ -38,9 +44,25 @@ const VideoComponent = React.forwardRef<HTMLVideoElement, VideoProps>(
     const setPlaybackSpeed = useVideoSessionStore((s) => s.setPlaybackSpeed);
     const setVolume = useVideoSessionStore((s) => s.setVolume);
 
-    const internalRef = React.useRef<HTMLVideoElement>(null);
-    const videoRef = (ref as React.RefObject<HTMLVideoElement>) || internalRef;
+    const videoRef = React.useRef<HTMLVideoElement>(null);
     const isSeeking = React.useRef(false);
+    const onPlaybackTimeChangeRef = React.useRef(onPlaybackTimeChange);
+
+    // Keep callback ref up to date
+    React.useEffect(() => {
+      onPlaybackTimeChangeRef.current = onPlaybackTimeChange;
+    }, [onPlaybackTimeChange]);
+
+    // Expose imperative handle for parent components
+    React.useImperativeHandle(ref, () => ({
+      seekTo: (time: number) => {
+        if (videoRef.current) {
+          isSeeking.current = true;
+          videoRef.current.currentTime = time;
+          setDisplayTime(time);
+        }
+      },
+    }), []);
 
     // Derived state
     const duration = metadata?.duration ?? 0;
@@ -128,6 +150,8 @@ const VideoComponent = React.forwardRef<HTMLVideoElement, VideoProps>(
       const handleTimeUpdate = () => {
         if (!isSeeking.current) {
           setDisplayTime(video.currentTime);
+          // Notify parent of time changes
+          onPlaybackTimeChangeRef.current?.(video.currentTime);
         }
         // Check store state directly to avoid stale closure
         const state = useVideoSessionStore.getState().state;
@@ -140,6 +164,8 @@ const VideoComponent = React.forwardRef<HTMLVideoElement, VideoProps>(
         console.log(`[Video:${videoId.slice(0, 8)}] seeked: currentTime=${video.currentTime}`);
         isSeeking.current = false;
         setDisplayTime(video.currentTime);
+        // Notify parent of time change after seek
+        onPlaybackTimeChangeRef.current?.(video.currentTime);
 
         const state = useVideoSessionStore.getState().state;
         if (state === 'SEEKING') {
@@ -228,7 +254,8 @@ const VideoComponent = React.forwardRef<HTMLVideoElement, VideoProps>(
 
     return (
       <div className={cn("flex flex-col gap-4", className)}>
-        <div className="relative w-full" style={{ paddingBottom: `${aspectRatio}%` }}>
+        {/* Video element with shadow */}
+        <div className="relative w-full shadow-xl rounded-2xl" style={{ paddingBottom: `${aspectRatio}%` }}>
           {/* Loading skeleton */}
           <div className={cn(
             "absolute inset-0 bg-foreground/10 rounded-2xl flex items-center justify-center transition-opacity duration-300",
@@ -242,7 +269,6 @@ const VideoComponent = React.forwardRef<HTMLVideoElement, VideoProps>(
             </div>
           </div>
 
-          {/* Video element */}
           <video
             key={videoId}
             ref={videoRef}
@@ -256,7 +282,8 @@ const VideoComponent = React.forwardRef<HTMLVideoElement, VideoProps>(
           />
         </div>
 
-        <div className="flex flex-col gap-3">
+        {/* Controls in card */}
+        <Card className="flex flex-col gap-3 p-4">
           {/* Seek slider */}
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-muted-foreground min-w-14 text-right pt-1">
@@ -281,7 +308,7 @@ const VideoComponent = React.forwardRef<HTMLVideoElement, VideoProps>(
               variant="outline"
               size="lg"
               onClick={togglePlayPause}
-              className="flex-shrink-0"
+              className="flex-shrink-0 rounded-full w-12 h-12"
             >
               {isPlaying ? (
                 <Pause className="w-6 h-6" />
@@ -323,7 +350,7 @@ const VideoComponent = React.forwardRef<HTMLVideoElement, VideoProps>(
               </div>
             </div>
           </div>
-        </div>
+        </Card>
       </div>
     );
   }

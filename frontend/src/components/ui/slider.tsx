@@ -11,6 +11,7 @@ export interface SliderProps {
   disabled?: boolean;
   className?: string;
   showSteps?: boolean;
+  orientation?: "horizontal" | "vertical";
 }
 
 const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
@@ -25,6 +26,7 @@ const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
       disabled = false,
       className,
       showSteps = false,
+      orientation = "horizontal",
     },
     ref
   ) => {
@@ -53,9 +55,18 @@ const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
       return marks;
     }, [showSteps, min, max, step]);
 
+    const isVertical = orientation === "vertical";
+
+    // For vertical sliders with RTL, we need to invert the fill percentage
+    const fillPercentage = isVertical ? (100 - percentage) : percentage;
+
+    const backgroundGradient = isVertical
+      ? `linear-gradient(to bottom, #458588 0%, #458588 ${fillPercentage}%, rgba(69, 133, 136, 0.2) ${fillPercentage}%, rgba(69, 133, 136, 0.2) 100%)`
+      : `linear-gradient(to right, #458588 0%, #458588 ${percentage}%, rgba(69, 133, 136, 0.2) ${percentage}%, rgba(69, 133, 136, 0.2) 100%)`;
+
     return (
-      <div className="relative w-full">
-        {showSteps && (
+      <div className={cn("relative", isVertical ? "h-full w-fit" : "w-full")}>
+        {showSteps && !isVertical && (
           <div className="absolute inset-0 pointer-events-none flex items-center z-0">
             {stepMarks.map((mark) => (
               <div
@@ -79,10 +90,15 @@ const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
         onChange={handleChange}
         disabled={disabled}
         style={{
-          background: `linear-gradient(to right, #458588 0%, #458588 ${percentage}%, rgba(69, 133, 136, 0.2) ${percentage}%, rgba(69, 133, 136, 0.2) 100%)`
+          background: backgroundGradient,
+          ...(isVertical && {
+            writingMode: 'vertical-lr',
+            direction: 'rtl',
+          })
         }}
         className={cn(
-          "slider-input w-full h-1.5 rounded-full appearance-none cursor-pointer relative z-10",
+          "slider-input rounded-full appearance-none cursor-pointer relative z-10",
+          isVertical ? "h-full w-1.5" : "w-full h-1.5",
           "[&::-webkit-slider-runnable-track]:h-1.5",
           "[&::-webkit-slider-runnable-track]:rounded-full",
           "[&::-webkit-slider-thumb]:appearance-none",

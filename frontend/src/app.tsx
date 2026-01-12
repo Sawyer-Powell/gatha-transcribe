@@ -44,11 +44,21 @@ const NotFound = () => (
 
 export function App() {
   const checkAuth = useAppLocalStore(state => state.checkAuth);
+  const theme = useAppLocalStore(state => state.theme);
 
   // Check auth once when app loads
   useEffect(() => {
     checkAuth();
   }, []);
+
+  // Apply theme on mount and when it changes
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { useLocation } from 'preact-iso';
 import { useAppLocalStore } from '../stores/appLocalStore';
 import { Button } from '../components/ui/button';
@@ -8,8 +8,17 @@ export const LoginPage = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, register, error, isLoading } = useAppLocalStore();
+  const { login, register, error, isLoading, user, isInitialized, checkAuth } = useAppLocalStore();
   const location = useLocation();
+
+  // Redirect to home if already authenticated
+  useEffect(() => {
+    if (!isInitialized) {
+      checkAuth();
+    } else if (user) {
+      location.route('/', true);
+    }
+  }, [user, isInitialized, checkAuth, location]);
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
