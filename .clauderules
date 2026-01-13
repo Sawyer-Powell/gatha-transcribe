@@ -1,48 +1,28 @@
-# Critical Rules - Always Active
+# Critical Rules
 
-## Version Control (jj)
-```bash
-jj describe -m "message"    # Set commit message
-jj bookmark set main -r @   # Move bookmark to current commit
-jj git push                 # Push to remote
-jj git fetch                # Fetch from remote
-jj log -r @                 # View current commit
-jj abandon                  # Discard unwanted changes
-```
+## Version Control: jj (Jujutsu)
+- We use **jj**, not git commands
+- See CLAUDE.md → "Version Control with jj" for full workflow
+- Key: `jj describe -m` → `jj bookmark set main -r @` → `jj git push`
 
-## Bead Workflow (Mandatory)
-- **One bead = one small testable component = one commit**
-- **Every bead has automated tests verifying system invariants**
-- **All work verified by executing tests before user review**
-- Follow 8-step workflow: Read → Assess → Design & Confirm → Implement → Execute Tests → Ask Follow-up → User Review → Commit & Push
-- Only mark bead completed after user accepts AND jj git push succeeds
-- Work is NOT complete until pushed to remote
-
-## Session Close Protocol
-```bash
-bd sync --from-main         # Sync beads
-jj bookmark set main -r @   # Move bookmark
-jj git push                 # MANDATORY - push changes
-jj log -r @                 # Verify pushed
-```
-
-## Commit Format
-```
-<imperative title>
-
-<optional description>
-
-Resolves: <bead-id>
-```
+## Issue Tracking: beads
+- Track multi-session work, dependencies, discovered tasks
+- See CLAUDE.md → "Bead Workflow" for 8-step process
+- Close beads when complete and verified by human: `bd close <id1> <id2> ...`
+- Sync before push: `bd sync --from-main`
 
 ## Code Style
-- **NO emojis in code** (comments, logs, errors, UI)
-- JS/TS: Simple functional style, no classes, no module-level state
-- Rust: Standard patterns (impl blocks ok)
-- Test invariants, not individual functions
+- See CLAUDE.md → "Code Style Guide" for full details
+- NO emojis in code (comments, logs, errors, UI)
+- Test invariants, not implementation details
+- Prefer editing existing files over creating new ones
 
-## Key Principles
-- ALWAYS prefer editing existing files over creating new ones
-- Read files before editing
-- Professional, informative tone
-- Context in folder-specific CLAUDE.md files
+## Session Close Checklist
+**Before saying "done":**
+1. Close completed beads: `bd close <id1> <id2> ...`
+2. `bd sync --from-main` (pull latest beads)
+3. `jj describe -m "message\n\nResolves: <bead-id>"`
+4. `jj bookmark set main -r @`
+5. `jj git push`
+
+Work is NOT complete until `jj git push` succeeds.
