@@ -24,10 +24,18 @@ export const test = base.extend<TestFixtures>({
       const consoleErrors: string[] = [];
       const networkErrors: Array<{ url: string; status: number; statusText: string }> = [];
 
-      // Collect console errors
+      // Collect console errors (excluding expected browser resource loading errors)
       page.on('console', (msg) => {
         if (msg.type() === 'error') {
-          consoleErrors.push(msg.text());
+          const errorText = msg.text();
+
+          // Ignore browser "Failed to load resource" errors for 401 responses
+          // These occur during auth checks (checkAuth) when user is not logged in
+          if (errorText.includes('Failed to load resource') && errorText.includes('401')) {
+            return;
+          }
+
+          consoleErrors.push(errorText);
         }
       });
 
@@ -37,11 +45,6 @@ export const test = base.extend<TestFixtures>({
 
         // Ignore expected 401s during login failure tests and logout tests
         if (response.status() === 401 && url.includes('/api/auth/')) {
-          return;
-        }
-
-        // Ignore expected 500s on video file requests (video file may not exist in test env)
-        if (url.includes('/api/videos/') && response.status() === 500) {
           return;
         }
 

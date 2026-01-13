@@ -25,7 +25,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Seeded {} test video(s)", test_videos.len());
 
     // Use fixtures/videos as filestore (where test videos actually exist)
-    let filestore_path = PathBuf::from("fixtures/videos");
+    // Resolve to absolute path relative to project root
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let filestore_path = PathBuf::from(manifest_dir).join("fixtures/videos");
     let filestore = LocalFileStore::new(filestore_path).await?;
 
     // Create session store

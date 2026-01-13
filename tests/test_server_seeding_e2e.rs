@@ -91,7 +91,7 @@ async fn test_seeded_videos_accessible() {
 
     let video = &videos[0];
     assert_eq!(video["original_filename"], "test_video.mp4");
-    assert_eq!(video["file_path"], "fixtures/videos/test_video.mp4");
+    assert_eq!(video["file_path"], "test_video.mp4");
 
     println!("✓ Seeded videos are accessible via API");
 }

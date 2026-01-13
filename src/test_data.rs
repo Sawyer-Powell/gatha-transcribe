@@ -52,7 +52,7 @@ pub async fn seed_test_videos(
     for filename in video_filenames {
         let video = Video {
             id: Uuid::new_v4().to_string(),
-            file_path: format!("fixtures/videos/{}", filename),
+            file_path: filename.to_string(),
             original_filename: filename.to_string(),
             user_id: user_id.to_string(),
             uploaded_at: Utc::now(),
@@ -106,8 +106,8 @@ mod tests {
         assert_eq!(videos.len(), 2);
         assert_eq!(videos[0].original_filename, "test1.mp4");
         assert_eq!(videos[1].original_filename, "test2.mp4");
-        assert_eq!(videos[0].file_path, "fixtures/videos/test1.mp4");
-        assert_eq!(videos[1].file_path, "fixtures/videos/test2.mp4");
+        assert_eq!(videos[0].file_path, "test1.mp4");
+        assert_eq!(videos[1].file_path, "test2.mp4");
 
         // Verify videos can be retrieved from database
         let user_videos = db.get_videos_by_user(&user.id).await.unwrap();
