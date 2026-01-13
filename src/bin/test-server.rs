@@ -19,8 +19,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let test_user = test_data::seed_test_user(&db).await?;
     println!("Test user created: {}", test_user.email);
 
-    // Seed test videos (using Zoom video from fixtures)
-    let video_filenames = &["Zoom Meeting Recording.mp4"];
+    // Seed test videos (using test_video1 from fixtures)
+    let video_filenames = &["test_video1.mp4"];
     let test_videos = test_data::seed_test_videos(&db, &test_user.id, video_filenames).await?;
     println!("Seeded {} test video(s)", test_videos.len());
 
