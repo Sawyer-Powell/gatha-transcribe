@@ -19,7 +19,29 @@ npm run test:headed   # See browser
 - Seeded user: `test@example.com` / `password123`
 - Seeded videos from `fixtures/videos/`
 
-## Writing Tests
+## Writing Tests: Focus on System Invariants
+
+**CRITICAL PRINCIPLE:** Playwright tests verify important **system invariants**, not implementation details.
+
+### Workflow for New Tests
+
+**1. Identify System Invariants (Q&A with User)**
+Before writing tests, use **AskUserQuestion** tool to confirm:
+- What system-level behavior must always be true?
+- What are the critical user flows that must work?
+- What are the acceptance criteria for this feature?
+
+**2. Write Focused Tests**
+Each test verifies ONE important invariant. Examples of good invariants:
+- "Logged-in users can upload videos and see them in their list"
+- "Session persists across page refreshes"
+- "Unauthorized users cannot access protected pages"
+
+**3. Avoid Testing Implementation**
+Don't test:
+- Internal function calls
+- Component rendering details
+- API request/response formats (unless that IS the invariant)
 
 **Location:** `tests/*.test.ts`
 
@@ -27,9 +49,19 @@ npm run test:headed   # See browser
 ```typescript
 import { test, expect } from '@playwright/test';
 
-test('descriptive name', async ({ page, request }) => {
+test('user can log in and session persists across refresh', async ({ page }) => {
   await page.goto('/login');
-  // ... assertions
+  // Test the invariant: authentication works end-to-end
+  await page.fill('[name="email"]', 'test@example.com');
+  await page.fill('[name="password"]', 'password123');
+  await page.click('button[type="submit"]');
+
+  // Verify logged-in state
+  await expect(page.locator('text=Dashboard')).toBeVisible();
+
+  // Verify session persists (the invariant)
+  await page.reload();
+  await expect(page.locator('text=Dashboard')).toBeVisible();
 });
 ```
 
@@ -46,10 +78,12 @@ playwright/
 
 ## Key Patterns
 
+- **Test system invariants, not implementation details**
+- **Always confirm invariants with user via AskUserQuestion before writing tests**
 - Use `page` for browser interactions
-- Use `request` for API calls
-- Test invariants: server starts, frontend loads, APIs work, server tears down
-- Keep tests focused on user flows, not implementation
+- Use `request` for API calls when testing API-level invariants
+- Keep tests focused on critical user flows and acceptance criteria
+- One test = one important invariant
 
 ## Configuration
 
@@ -67,11 +101,24 @@ npm run test:headed  # Shows browser
 
 Check test server logs if tests fail to start.
 
-## Writing new tests
+## Workflow for Adding New Tests
 
-When writing new tests, spin up the test server with
+**1. Confirm Invariants (MANDATORY)**
+Use **AskUserQuestion** tool to establish:
+- What system behavior are we testing?
+- What must always be true?
+- What are the acceptance criteria?
 
-`cargo run --bin test-server`
+**2. Map Out Selectors**
+Spin up the test server: `cargo run --bin test-server`
 
-then use the playwright-mcp if available against localhost:3000 
-to determine all the selectors you'll need and map out the test.
+Then use playwright-mcp (if available) against `localhost:3000` to:
+- Identify selectors needed for the test
+- Understand the user flow
+- Map out the test structure
+
+**3. Write Focused Test**
+Write ONE test per invariant. Keep it simple and focused on the system-level behavior.
+
+**4. Verify Test**
+Run the test to ensure it verifies the invariant correctly.
