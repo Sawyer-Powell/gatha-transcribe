@@ -39,7 +39,7 @@ async fn main() {
         session_store: Arc::new(session_store),
     });
 
-    let (_router, api) = create_router(state);
+    let (_router, api) = create_router(state, None);
     let json = serde_json::to_string_pretty(&api).expect("Failed to serialize OpenAPI spec");
     fs::write("openapi.json", json).expect("Failed to write openapi.json");
     println!("✓ OpenAPI spec generated at openapi.json");

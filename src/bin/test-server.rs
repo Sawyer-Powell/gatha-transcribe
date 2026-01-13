@@ -1,6 +1,6 @@
 use gatha_transcribe::{
-    create_router, db::Database, filestore::LocalFileStore, session_store::InMemorySessionStore,
-    test_data, upload::AppState,
+    create_router, db::Database, filestore::LocalFileStore,
+    session_store::InMemorySessionStore, test_data, upload::AppState,
 };
 use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
@@ -51,7 +51,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Password: {}", test_data::TEST_USER_PASSWORD);
     println!();
 
-    let (router, _api) = create_router(state);
+    // Serve frontend from dist directory
+    // Use FRONTEND_DIST_PATH env var, or default to ../frontend/dist from binary location
+    let frontend_path = if let Ok(path) = std::env::var("FRONTEND_DIST_PATH") {
+        PathBuf::from(path)
+    } else {
+        // Default: assume running from project root
+        // Resolve to absolute path relative to the binary's location
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        PathBuf::from(manifest_dir).join("frontend/dist")
+    };
+
+    // Verify paths exist
+    if !frontend_path.exists() {
+        eprintln!("ERROR: Frontend path does not exist: {:?}", frontend_path);
+        eprintln!("Set FRONTEND_DIST_PATH environment variable or build frontend first");
+        return Err("Frontend dist directory not found".into());
+    }
+
+    println!("Serving frontend from: {:?}", frontend_path);
+
+    let (router, _api) = create_router(state, Some(frontend_path));
 
     axum::serve(listener, router).await?;
 

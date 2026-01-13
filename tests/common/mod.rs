@@ -43,7 +43,7 @@ pub async fn start_test_server(state: Arc<AppState>) -> String {
     let addr = listener.local_addr().unwrap();
     let base_url = format!("http://{}", addr);
 
-    let (router, _api) = create_router(state);
+    let (router, _api) = create_router(state, None);
 
     tokio::spawn(async move {
         axum::serve(listener, router).await.unwrap();

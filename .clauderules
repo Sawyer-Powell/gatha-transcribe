@@ -1,0 +1,48 @@
+# Critical Rules - Always Active
+
+## Version Control (jj)
+```bash
+jj describe -m "message"    # Set commit message
+jj bookmark set main -r @   # Move bookmark to current commit
+jj git push                 # Push to remote
+jj git fetch                # Fetch from remote
+jj log -r @                 # View current commit
+jj abandon                  # Discard unwanted changes
+```
+
+## Bead Workflow (Mandatory)
+- **One bead = one small testable component = one commit**
+- **Every bead has automated tests verifying system invariants**
+- **All work verified by executing tests before user review**
+- Follow 8-step workflow: Read → Assess → Design & Confirm → Implement → Execute Tests → Ask Follow-up → User Review → Commit & Push
+- Only mark bead completed after user accepts AND jj git push succeeds
+- Work is NOT complete until pushed to remote
+
+## Session Close Protocol
+```bash
+bd sync --from-main         # Sync beads
+jj bookmark set main -r @   # Move bookmark
+jj git push                 # MANDATORY - push changes
+jj log -r @                 # Verify pushed
+```
+
+## Commit Format
+```
+<imperative title>
+
+<optional description>
+
+Resolves: <bead-id>
+```
+
+## Code Style
+- **NO emojis in code** (comments, logs, errors, UI)
+- JS/TS: Simple functional style, no classes, no module-level state
+- Rust: Standard patterns (impl blocks ok)
+- Test invariants, not individual functions
+
+## Key Principles
+- ALWAYS prefer editing existing files over creating new ones
+- Read files before editing
+- Professional, informative tone
+- Context in folder-specific CLAUDE.md files

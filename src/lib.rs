@@ -1,5 +1,6 @@
 use axum::{
     extract::DefaultBodyLimit,
+    response::{Html, IntoResponse},
     routing::get,
     Json, Router,
 };
@@ -40,7 +41,18 @@ async fn get_user() -> Json<User> {
     })
 }
 
-pub fn create_router(state: Arc<AppState>) -> (axum::Router, utoipa::openapi::OpenApi) {
+/// Create router with optional frontend SPA serving
+///
+/// If `frontend_path` is provided, the router will serve the frontend application
+/// with SPA routing (all non-API routes fall back to index.html).
+///
+/// If `frontend_path` is None, only API routes and WebSocket are served.
+pub fn create_router(
+    state: Arc<AppState>,
+    frontend_path: Option<PathBuf>,
+) -> (axum::Router, utoipa::openapi::OpenApi) {
+    use tower_http::services::{ServeDir, ServeFile};
+
     let (api_router, api) = OpenApiRouter::new()
         .routes(routes!(get_user))
         .routes(routes!(upload::upload_video))
@@ -52,9 +64,44 @@ pub fn create_router(state: Arc<AppState>) -> (axum::Router, utoipa::openapi::Op
         .routes(routes!(auth::me))
         .split_for_parts();
 
-    let router = Router::new()
+    let mut router = Router::new()
         .merge(api_router)
-        .route("/ws/{video_id}", get(crate::websocket::ws_handler))
+        .route("/ws/{video_id}", get(crate::websocket::ws_handler));
+
+    // Add frontend serving if path is provided
+    if let Some(frontend_path) = frontend_path {
+        // Serve static assets from /assets directory
+        let assets_path = frontend_path.join("assets");
+        let serve_assets = ServeDir::new(&assets_path);
+
+        // Create SPA fallback handler that serves index.html
+        let index_path = frontend_path.join("index.html");
+        async fn spa_fallback(index_path: PathBuf) -> impl IntoResponse {
+            match tokio::fs::read_to_string(&index_path).await {
+                Ok(contents) => Html(contents).into_response(),
+                Err(_) => (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to read index.html",
+                )
+                    .into_response(),
+            }
+        }
+        let fallback_handler = {
+            let index = index_path.clone();
+            move || spa_fallback(index.clone())
+        };
+
+        // Serve vite.svg as a static file
+        let vite_svg_path = frontend_path.join("vite.svg");
+        let serve_vite_svg = ServeFile::new(vite_svg_path);
+
+        router = router
+            .nest_service("/assets", serve_assets)
+            .route_service("/vite.svg", serve_vite_svg)
+            .fallback(fallback_handler);
+    }
+
+    let router = router
         // CORS - must be before other middleware to handle preflight requests
         .layer(
             CorsLayer::new()
@@ -251,7 +298,7 @@ pub async fn start_server(
     info!("Spawning session persistence task");
     spawn_persistence_task(state.clone());
 
-    let (router, _api) = create_router(state.clone());
+    let (router, _api) = create_router(state.clone(), None);
 
     let addr = format!("0.0.0.0:{}", port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
