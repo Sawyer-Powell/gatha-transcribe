@@ -13,3 +13,4 @@
 /.playwright-mcp
 .playwright-mcp
 .playwright-mcp/*
+/fixtures

@@ -21,6 +21,7 @@ pub mod auth;
 pub mod session_store;
 pub mod websocket;
 pub mod error;
+pub mod test_data;
 
 use upload::AppState;
 

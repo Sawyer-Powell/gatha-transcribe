@@ -10,6 +10,40 @@
 3. **All work is verified by executing tests before user review**
 4. **Simple functional style: no classes, no module-level state (JS/TS)**
 
+### Working on Epics
+
+**When starting work on an epic**, the first step is ALWAYS to clarify the exact work with the user through questions.
+
+**Process:**
+1. **Lead with Questions** - Ask clarifying questions about:
+   - What are the specific acceptance criteria?
+   - What are the key invariants that must hold?
+   - Are there any constraints or preferences on implementation approach?
+   - What's the priority order of sub-components?
+   - Are there any examples or reference implementations?
+   - **USE the AskUserQuestion tool** (Claude Code question feature) to ask questions sequentially, not all at once
+
+2. **Break Down into Beads** - Based on the answers:
+   - Propose a list of concrete, small beads
+   - Each bead should be independently testable
+   - Order beads by dependencies and value
+
+3. **Get Confirmation** - Wait for user approval on:
+   - The breakdown approach
+   - The bead boundaries
+   - The implementation order
+
+4. **Create Bead Issues** - After confirmation:
+   - Create individual bead issues in the tracker
+   - Link dependencies between beads
+   - Update the epic with the breakdown
+
+5. **Execute Beads** - Follow the 8-step workflow for each bead
+
+**Key Rules**:
+- Never assume you understand the full scope of an epic. Always start with questions.
+- Use AskUserQuestion tool to ask questions one at a time, not in bulk.
+
 ### 8-Step Workflow (Required for Every Bead)
 
 **1. Read & Understand**
@@ -197,6 +231,21 @@ jj git push                  # Push to remote
 - Methods on structs are fine
 - Avoid global mutable state
 - Use standard Rust patterns (impl blocks, traits, etc.)
+
+**Professional Tone:**
+- **NO emojis in code** - Avoid emojis at all costs in source code, comments, error messages, or logs
+- Maintain a professional, informative tone throughout
+- Use clear, descriptive text instead of decorative elements
+- Example:
+  ```rust
+  // ❌ Bad: Uses emojis
+  println!("🚀 Test server ready!");
+  println!("  ✓ Test user created: {}", user.email);
+
+  // ✅ Good: Professional, informative
+  println!("Test server ready");
+  println!("Test user created: {}", user.email);
+  ```
 
 ---
 
