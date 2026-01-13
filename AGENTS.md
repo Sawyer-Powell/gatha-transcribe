@@ -65,7 +65,8 @@ bd sync               # Sync with jj
 8. **Commit & Push** (Only after acceptance)
    - One bead = one commit
    - Use `jj describe -m` to set commit message (follow format below)
-   - Use `jj git push` to push immediately
+   - Move bookmark: `jj bookmark set main -r @` (required before push)
+   - Push: `jj git push`
    - Update bead status with `bd close <id>` or `bd update <id>`
 
 ## Commit Message Format
@@ -105,6 +106,7 @@ and can be reliably retrieved after server restart.
 
 Resolves: gatha-transcribe-a6z"
 
+jj bookmark set main -r @
 jj git push
 ```
 
@@ -183,10 +185,11 @@ jj git push
 3. **Update issue status** - Close finished work, update in-progress items
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
-   jj git fetch  # Fetch latest from remote
-   bd sync       # Sync beads
-   jj git push   # Push changes
-   jj log -r @   # Verify current change is pushed
+   jj git fetch            # Fetch latest from remote
+   bd sync                 # Sync beads
+   jj bookmark set main -r @  # Move bookmark to current commit
+   jj git push             # Push changes
+   jj log -r @             # Verify current change is pushed
    ```
 5. **Clean up** - Use `jj abandon` for unwanted changes if needed
 6. **Verify** - All changes committed AND pushed
