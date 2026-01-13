@@ -241,7 +241,7 @@ pub fn spawn_persistence_task(state: Arc<AppState>) {
 /// Start the gatha-transcribe server
 ///
 /// This function initializes all components (database, filestore, session store)
-/// and starts the HTTP server on the specified port.
+/// and starts the HTTP server on the specified port, serving both API and frontend.
 ///
 /// Returns the server task handle and the app state.
 pub async fn start_server(
@@ -267,6 +267,24 @@ pub async fn start_server(
                 .unwrap_or_else(|_| "test_filestore".to_string())
         )
     });
+
+    // Determine frontend path
+    let frontend_path = if let Ok(path) = std::env::var("FRONTEND_DIST_PATH") {
+        PathBuf::from(path)
+    } else {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        PathBuf::from(manifest_dir).join("frontend/dist")
+    };
+
+    // Verify frontend exists
+    if !frontend_path.exists() {
+        return Err(format!(
+            "Frontend dist directory not found at: {:?}\nBuild the frontend first with: cd frontend && npm run build\nOr set FRONTEND_DIST_PATH environment variable",
+            frontend_path
+        ).into());
+    }
+
+    info!(path = ?frontend_path, "Serving frontend");
 
     // Initialize database
     info!(database_url = %database_url, "Connecting to database");
@@ -298,7 +316,7 @@ pub async fn start_server(
     info!("Spawning session persistence task");
     spawn_persistence_task(state.clone());
 
-    let (router, _api) = create_router(state.clone(), None);
+    let (router, _api) = create_router(state.clone(), Some(frontend_path));
 
     let addr = format!("0.0.0.0:{}", port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
