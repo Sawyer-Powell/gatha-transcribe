@@ -6,6 +6,9 @@
 .env
 .claude
 /.claude
+
+# Override global gitignore - we want CLAUDE.md tracked
+!CLAUDE.md
 /test_files
 /.playwright-mcp
 .playwright-mcp
