@@ -2,6 +2,20 @@
 
 > Quick reference for essential workflow rules. See CLAUDE.md for detailed documentation.
 
+## Issue Tracking: beads
+
+**Use beads for multi-session work, dependencies, and discovered tasks.**
+
+**MOST CRITICAL!!!! YOU MUST EXECUTE 8 STEP WORKFLOW for EVERY. SINGLE. BEAD.**
+
+- **Find work**: `bd ready` (shows unblocked tasks)
+- **Start work**: `bd update <id> --status=in_progress`
+- **Complete work**: `bd close <id1> <id2> ...` (close multiple at once)
+- **Sync beads**: `bd sync --from-main` (run before pushing)
+- **Epic beads**: Use AskUserQuestion tool to establish requirements, then break down into smaller beads with dependencies before implementing
+
+See CLAUDE.md → "Bead Workflow" for 8-step process.
+
 ## Version Control: jj (Jujutsu)
 
 **We use jj (Jujutsu), not git commands directly.**
@@ -13,17 +27,6 @@
 
 See CLAUDE.md → "Version Control with jj" for complete workflow.
 
-## Issue Tracking: beads
-
-**Use beads for multi-session work, dependencies, and discovered tasks.**
-
-- **Find work**: `bd ready` (shows unblocked tasks)
-- **Start work**: `bd update <id> --status=in_progress`
-- **Complete work**: `bd close <id1> <id2> ...` (close multiple at once)
-- **Sync beads**: `bd sync --from-main` (run before pushing)
-- **Epic beads**: Use AskUserQuestion tool to establish requirements, then break down into smaller beads with dependencies before implementing
-
-See CLAUDE.md → "Bead Workflow" for 8-step process.
 
 ## Code Style Standards
 

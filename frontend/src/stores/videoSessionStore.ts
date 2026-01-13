@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { ServerMessage } from '../types/ServerMessage';
 import type { ClientMessage } from '../types/ClientMessage';
 import type { SessionState } from '../types/SessionState';
+import { WS_URL } from '../config';
 
 // ============================================================================
 // Types
@@ -164,9 +165,7 @@ function connectWebSocket(
     return;
   }
 
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-  const wsUrl = baseUrl.replace(/^http/, 'ws');
-  const url = `${wsUrl}/ws/${videoId}`;
+  const url = `${WS_URL}/ws/${videoId}`;
 
   log(videoId, `Connecting to ${url}`);
 

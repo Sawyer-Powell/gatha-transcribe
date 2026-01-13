@@ -1,9 +1,10 @@
 import createClient from "openapi-fetch";
 import type { paths } from "./schema";
+import { BASE_URL } from "../config";
 
 // Create a typed fetch client
 const client = createClient<paths>({
-  baseUrl: "http://localhost:3000",
+  baseUrl: BASE_URL,
   credentials: "include", // Send cookies with all requests
 });
 

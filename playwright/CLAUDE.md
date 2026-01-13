@@ -66,3 +66,12 @@ npm run test:headed  # Shows browser
 ```
 
 Check test server logs if tests fail to start.
+
+## Writing new tests
+
+When writing new tests, spin up the test server with
+
+`cargo run --bin test-server`
+
+then use the playwright-mcp if available against localhost:3000 
+to determine all the selectors you'll need and map out the test.

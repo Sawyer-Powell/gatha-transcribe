@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test';
 
 /**
  * Smoke test to verify Playwright setup and test server integration

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { BASE_URL } from '../config';
 
 // ============================================================================
 // Types
@@ -43,12 +44,6 @@ interface AppLocalActions {
 export type AppLocalStore = AppLocalState & AppLocalActions;
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-const API_BASE_URL = 'http://localhost:3000';
-
-// ============================================================================
 // Store
 // ============================================================================
 
@@ -87,7 +82,7 @@ export const useAppLocalStore = create<AppLocalStore>()(
 
       checkAuth: async () => {
         try {
-          const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          const response = await fetch(`${BASE_URL}/api/auth/me`, {
             credentials: 'include',
           });
 
@@ -107,7 +102,7 @@ export const useAppLocalStore = create<AppLocalStore>()(
       login: async (email, password) => {
         set({ error: null, isLoading: true });
         try {
-          const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+          const response = await fetch(`${BASE_URL}/api/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -130,7 +125,7 @@ export const useAppLocalStore = create<AppLocalStore>()(
       register: async (name, email, password) => {
         set({ error: null, isLoading: true });
         try {
-          const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+          const response = await fetch(`${BASE_URL}/api/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -152,7 +147,7 @@ export const useAppLocalStore = create<AppLocalStore>()(
 
       logout: async () => {
         try {
-          await fetch(`${API_BASE_URL}/api/auth/logout`, {
+          await fetch(`${BASE_URL}/api/auth/logout`, {
             method: 'POST',
             credentials: 'include',
           });

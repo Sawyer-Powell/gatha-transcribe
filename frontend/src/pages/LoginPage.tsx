@@ -63,8 +63,9 @@ export const LoginPage = () => {
         <form onSubmit={handleSubmit as any} className="space-y-4">
           {activeTab === 'register' && (
             <div>
-              <label className="block text-sm font-medium mb-1">Name</label>
+              <label htmlFor="name-input" className="block text-sm font-medium mb-1">Name</label>
               <input
+                id="name-input"
                 type="text"
                 value={name}
                 onChange={(e) => setName((e.target as HTMLInputElement).value)}
@@ -75,8 +76,9 @@ export const LoginPage = () => {
           )}
 
           <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
+            <label htmlFor="email-input" className="block text-sm font-medium mb-1">Email</label>
             <input
+              id="email-input"
               type="email"
               value={email}
               onChange={(e) => setEmail((e.target as HTMLInputElement).value)}
@@ -86,8 +88,9 @@ export const LoginPage = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Password</label>
+            <label htmlFor="password-input" className="block text-sm font-medium mb-1">Password</label>
             <input
+              id="password-input"
               type="password"
               value={password}
               onChange={(e) => setPassword((e.target as HTMLInputElement).value)}
